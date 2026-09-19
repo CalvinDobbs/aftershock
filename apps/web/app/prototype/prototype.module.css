@@ -1,0 +1,628 @@
+.shell {
+  min-height: 100dvh;
+  background: var(--color-page);
+  color: var(--color-ink-2);
+  font-family: var(--font-sans);
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: var(--color-rail);
+  border-bottom: 1px solid var(--color-edge);
+  flex-shrink: 0;
+}
+
+.wordmark {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--color-ink-1);
+}
+
+.ctx {
+  font-size: 11.5px;
+  color: var(--color-ink-6);
+  white-space: nowrap;
+}
+
+.ctxTitle {
+  font-size: 11.5px;
+  color: var(--color-ink-8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.disclosure {
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-8);
+  border: 1px solid var(--color-edge-2);
+  border-radius: 6px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ghostBtn {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-ink-4);
+  background: var(--color-card);
+  border: 1px solid var(--color-edge-2);
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ghostBtn:hover {
+  border-color: var(--color-amber);
+  color: var(--color-ink-1);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-right: 1px solid var(--color-edge);
+  background: var(--color-rail);
+  min-height: 0;
+}
+
+.railHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-ink-8);
+}
+
+.railStatus {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.work {
+  color: var(--color-amber);
+}
+
+.bad {
+  color: var(--color-alarm);
+}
+
+.ok {
+  color: var(--color-say-green);
+}
+
+.agents {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.agent-running {
+  border-color: rgba(245, 166, 35, 0.35);
+  background: rgba(245, 166, 35, 0.05);
+}
+
+.agent-attention {
+  border-color: rgba(240, 103, 74, 0.4);
+  background: rgba(240, 103, 74, 0.06);
+}
+
+.agent-queued {
+  opacity: 0.55;
+}
+
+.agentMark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-4);
+  background: var(--color-card);
+  border: 1px solid var(--color-edge-2);
+  flex-shrink: 0;
+}
+
+.agent-running .agentMark {
+  color: var(--color-amber);
+  border-color: rgba(245, 166, 35, 0.45);
+}
+
+.agent-attention .agentMark {
+  color: var(--color-alarm);
+  border-color: rgba(240, 103, 74, 0.5);
+}
+
+.agent-done .agentMark {
+  color: var(--color-say-green);
+  border-color: rgba(127, 211, 163, 0.35);
+}
+
+.agentBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.agentName {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink-3);
+}
+
+.agentSub {
+  font-size: 10px;
+  color: var(--color-ink-8);
+}
+
+.agentState {
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  color: var(--color-ink-8);
+  flex-shrink: 0;
+}
+
+.agent-running .agentState {
+  color: var(--color-amber);
+}
+
+.agent-attention .agentState {
+  color: var(--color-alarm);
+}
+
+.agent-done .agentState {
+  color: var(--color-say-green);
+}
+
+.legend {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-edge);
+  font-size: 10px;
+  color: var(--color-ink-7);
+}
+
+.legendNote {
+  color: var(--color-ink-8);
+  line-height: 1.4;
+}
+
+/* The conversation sits a step lighter than the page, the way the room does.
+   Bubbles are meant to lift off this surface, not off black. */
+.room {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--color-stage);
+}
+
+.stageRail {
+  height: 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-bottom: 1px solid var(--color-edge);
+  flex-shrink: 0;
+}
+
+.stages {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  overflow-x: auto;
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-8);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stage:hover {
+  color: var(--color-ink-3);
+}
+
+.stageDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid var(--color-edge-3);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--color-say-green);
+}
+
+.stageDone {
+  color: var(--color-ink-6);
+}
+
+.stageDone .stageDot {
+  border-color: var(--color-say-green);
+}
+
+.stageActive {
+  color: var(--color-ink-1);
+}
+
+.stageActive .stageDot {
+  border-color: var(--color-amber);
+  background: var(--color-amber);
+}
+
+.progressTrack {
+  height: 2px;
+  background: var(--color-edge);
+  margin: 4px 12px 0;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-amber);
+  transition: width 0.4s ease;
+}
+
+.thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 20px 26px 24px;
+}
+
+.systemLine {
+  font-size: 12.5px;
+  line-height: 1;
+  color: var(--color-ink-8);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Messages keep their natural height. Without flex-shrink:0 the column would
+   compress every turn to fit the viewport instead of overflowing, so the
+   bubbles would get shorter and shorter as the run went on. */
+.msg {
+  display: flex;
+  gap: 11px;
+  flex-shrink: 0;
+}
+
+/* A solid disc with a dark glyph — the same construction as the room's bot
+   avatars, and the same per-stage colours. The colour says which stage, the
+   two letters say the role, so nothing has to be named to be recognised. */
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #2a2a2a;
+  background: #8a8a8a;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.markPlanner {
+  background: #d6a13c;
+  color: #3d2c0c;
+}
+
+.markQA {
+  background: #4fae7a;
+  color: #0f2e1e;
+}
+
+.markValidator {
+  background: #d6604f;
+  color: #3d1410;
+}
+
+.markDiagnosis {
+  background: #4f9fd6;
+  color: #0e2439;
+}
+
+.markRepair {
+  background: #b58a5f;
+  color: #33220f;
+}
+
+.markVerifier {
+  background: #68b55f;
+  color: #0f2c0c;
+}
+
+/* One measure for every turn. A turn that runs the full column reads as a
+   document rather than something said, but varying the cap per turn leaves a
+   ragged right edge — so every bubble stops at the same place, and the width
+   is chosen so three feeds still sit comfortably abreast inside one. */
+.msgBody {
+  flex: 1;
+  min-width: 0;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.msgHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.msgRole {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 500;
+  color: var(--color-ink-1);
+}
+
+.msgFn {
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--color-ink-8);
+}
+
+.msgTime {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--color-ink-8);
+}
+
+/* Flat, borderless, generous — a spoken turn, not a data panel. */
+.bubble {
+  background: var(--color-bubble);
+  border-radius: 14px;
+  padding: 13px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bubbleGood {
+  background: rgba(127, 211, 163, 0.07);
+}
+
+.msgText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+.claim {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--color-ink-5);
+  border-left: 2px solid var(--color-edge-3);
+  padding-left: 11px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--color-ink-5);
+  background: var(--color-chip);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.fleet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fleetHead {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-8);
+}
+
+.fleetGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compare {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+
+.compareCell {
+  padding: 6px 11px;
+  background: var(--color-sunk);
+  border-radius: 8px;
+  color: var(--color-ink-4);
+}
+
+.compareBad {
+  color: var(--color-alarm);
+  font-weight: 600;
+}
+
+.fact {
+  font-size: 11.5px;
+  color: var(--color-ink-8);
+  margin-left: auto;
+}
+
+.factGood {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-say-green);
+}
+
+.diff {
+  margin: 0;
+  padding: 10px 13px;
+  background: var(--color-shot);
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.diffMinus {
+  color: var(--color-minus);
+}
+
+.diffPlus {
+  color: var(--color-plus);
+}
+
+@media (min-width: 1000px) {
+  .shell {
+    height: 100dvh;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 52px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    border-right: none;
+    border-bottom: 1px solid var(--color-edge);
+    padding: 10px 12px;
+  }
+
+  .agents {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .agent {
+    flex: 1 1 150px;
+  }
+
+  .legend {
+    margin-top: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .legendNote {
+    flex-basis: 100%;
+  }
+
+  .thread {
+    overflow: visible;
+  }
+
+  .fleetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .ctx,
+  .ctxTitle,
+  .disclosure {
+    display: none;
+  }
+
+  .fleetGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    flex: none;
+  }
+}
