@@ -55,6 +55,7 @@ const screenshotRepository: ScreenshotRepository = {
 
 let demoRunResult: { runId: string; assignmentId: string } | undefined;
 let canaryRunResult: { runId: string; assignmentId: string } | undefined;
+const commitRuns: unknown[] = [];
 let server: Server;
 let noLauncherServer: Server;
 let base: string;
@@ -68,6 +69,10 @@ beforeAll(async () => {
     screenshotRepository,
     demoRunLauncher: () => demoRunResult,
     noiseCanaryLauncher: () => canaryRunResult,
+    commitRunLauncher: (request) => {
+      commitRuns.push(request);
+      return { runId: "run-from-commit" };
+    },
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -178,6 +183,98 @@ describe("observability api", () => {
     const conflict = await fetch(`${base}/api/demo/runs`, { method: "POST" });
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toEqual({ error: "A demo run is already active" });
+  });
+
+  it("accepts a commit run and answers with its id", async () => {
+    const response = await fetch(`${base}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repo: "meridian-labs/meridian",
+        base: "main",
+        head: "a3f9c21",
+        previewUrl: "https://preview.example.com",
+        baseUrl: "https://example.com",
+      }),
+    });
+
+    // 202, not 200: a run takes minutes and is followed on the event stream.
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ run: { runId: "run-from-commit" } });
+    expect(commitRuns).toHaveLength(1);
+  });
+
+  it("rejects a malformed commit run and says what was wrong", async () => {
+    const response = await fetch(`${base}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ repo: "not-a-repo", base: "main", head: "x", previewUrl: "nope" }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; issues: string[] };
+    expect(body.error).toBe("Invalid request");
+    // A 400 with no detail is a debugging session.
+    expect(body.issues.join(" ")).toContain("repo");
+    expect(body.issues.join(" ")).toContain("previewUrl");
+  });
+
+  it("answers 400, not 5xx, to a malformed body", async () => {
+    // Webhooks retry on 5xx. A 502 here turns one bad payload into a loop.
+    const response = await fetch(`${base}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json() as { issues: string[] }).issues[0]).toContain("not valid JSON");
+  });
+
+  it("rejects fallback routes that are not absolute", async () => {
+    const response = await fetch(`${base}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repo: "o/r",
+        base: "main",
+        head: "abc",
+        previewUrl: "https://preview.example.com",
+        fallbackRoutes: ["cart"],
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json() as { issues: string[] }).issues.join(" ")).toContain("start with /");
+  });
+
+  it("allows a commit run with no base deployment", async () => {
+    // Base URL resolution can fail. Differential pairs are then skipped and
+    // the run continues with conformance only.
+    const response = await fetch(`${base}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repo: "o/r",
+        base: "main",
+        head: "abc",
+        previewUrl: "https://preview.example.com",
+        baseUrl: null,
+      }),
+    });
+    expect(response.status).toBe(202);
+  });
+
+  it("returns 404 for a commit run when no launcher is configured", async () => {
+    const response = await fetch(`${noLauncherBase}/api/runs/from-commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        repo: "o/r",
+        base: "main",
+        head: "abc",
+        previewUrl: "https://preview.example.com",
+      }),
+    });
+    expect(response.status).toBe(404);
   });
 
   it("launches the noise canary with 202 and rejects a concurrent one with 409", async () => {

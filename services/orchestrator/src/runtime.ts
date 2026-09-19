@@ -14,7 +14,12 @@ import { runObservableAssignment } from "./assignment-runner.js";
 import { runObservableDifferential } from "./differential-runner.js";
 import { RunEventStream } from "./event-stream.js";
 import { JsonlEventRepository } from "./jsonl-event-repository.js";
-import { createObservabilityServer, type DemoRun } from "./observability-api.js";
+import { runFromCommit } from "./commit-run.js";
+import {
+  createObservabilityServer,
+  type CommitRunRequest,
+  type DemoRun,
+} from "./observability-api.js";
 import { FileScreenshotRepository } from "./screenshot-repository.js";
 
 export interface ObservabilityRuntimeOptions {
@@ -34,6 +39,8 @@ export interface ObservabilityRuntime {
   ): ReturnType<typeof runDifferential>;
   startDemoRun(): DemoRun | undefined;
   startNoiseCanary(): DemoRun | undefined;
+  /** Scout reads the commit, the Director dispatches the fleet. */
+  startCommitRun(request: CommitRunRequest): { runId: string };
 }
 
 export function createObservabilityRuntime(
@@ -125,12 +132,53 @@ export function createObservabilityRuntime(
     return { runId: assignment.runId, assignmentId: assignment.id };
   };
 
+  /**
+   * One commit in, a fleet out. Returns as soon as the run has an id, because
+   * a real run takes minutes and the caller follows it on the event stream.
+   */
+  let commitCounter = 0;
+  const startCommitRun = (request: CommitRunRequest): { runId: string } => {
+    const runId = `run-${Date.now()}-${commitCounter++}`;
+    void runFromCommit({
+      runId,
+      repo: request.repo,
+      base: request.base,
+      head: request.head,
+      ...(request.prNumber !== undefined ? { prNumber: request.prNumber } : {}),
+      previewUrl: request.previewUrl,
+      baseUrl: request.baseUrl ?? null,
+      ...(request.fallbackRoutes ? { fallbackRoutes: request.fallbackRoutes } : {}),
+      ...(request.routeSamples ? { routeSamples: request.routeSamples } : {}),
+      ...(request.criticalJourney ? { criticalJourney: request.criticalJourney } : {}),
+      ...(request.maxConcurrent !== undefined ? { maxConcurrent: request.maxConcurrent } : {}),
+      eventStream,
+      screenshotRepository,
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`run ${runId} failed:`, error);
+
+      // A run can die before any browser opens — a GitHub 404, a rate limit,
+      // a model outage. Without this the run id has no traces at all, so it
+      // never appears in /api/runs and its stream stays empty forever, which
+      // contradicts the 202 "follow it on the stream" contract.
+      void eventStream.publish({
+        runId,
+        assignmentId: "director",
+        timestamp: new Date().toISOString(),
+        type: "session.failed",
+        message: `run failed before dispatch: ${message}`,
+      });
+    });
+    return { runId };
+  };
+
   const server = createObservabilityServer({
     eventStream,
     replayService: createSessionReplayService(options.browserbaseApiKey),
     screenshotRepository,
     demoRunLauncher: startDemoRun,
     noiseCanaryLauncher: startNoiseCanary,
+    commitRunLauncher: startCommitRun,
   });
 
   return {
@@ -143,5 +191,6 @@ export function createObservabilityRuntime(
       runObservableDifferential({ ...differentialOptions, eventStream, screenshotRepository }),
     startDemoRun,
     startNoiseCanary,
+    startCommitRun,
   };
 }

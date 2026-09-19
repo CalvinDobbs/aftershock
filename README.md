@@ -193,6 +193,39 @@ field is missing. The two worth fixing first:
   It is the DEMO_MODE replay source, and a dead network on stage should cost
   nothing.
 
+## Running a real commit
+
+```bash
+curl -X POST localhost:3001/api/runs/from-commit \
+  -H 'content-type: application/json' \
+  -d '{
+    "repo": "owner/repo",
+    "base": "main",
+    "head": "a3f9c21",
+    "prNumber": 142,
+    "previewUrl": "https://app-git-feat.vercel.app",
+    "baseUrl": "https://app.vercel.app",
+    "fallbackRoutes": ["/", "/cart"],
+    "criticalJourney": {
+      "description": "Buy something without using the new feature",
+      "steps": ["Open the first product", "Add it to the cart", "Check out"]
+    }
+  }'
+```
+
+Answers `202` with a run id; follow it on `/api/runs/:id/events/stream`.
+
+What happens: Scout reads the diff and writes a charter, the charter becomes
+assignments, and the Director dispatches them against a semaphore —
+differential pairs first, because they hold two slots and are worth the most.
+`baseUrl: null` is allowed; differential pairs are then skipped and the run
+continues on conformance alone.
+
+Nothing is dropped silently. Anything that could not run comes back in
+`skipped` with the stage that dropped it — `charter` means Scout could not
+make it runnable, `dispatch` means there was no capacity, `run` means the
+browser died. Those need different fixes, so they are distinguishable.
+
 ## Differential execution
 
 The second oracle, and the only part of the pipeline that produces findings

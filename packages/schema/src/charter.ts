@@ -26,6 +26,14 @@ export const Assertion = z.object({
   statement: z.string().optional(),
   /** Differential: the journey replayed in lockstep against preview and base. */
   journey: z.string().optional(),
+  /**
+   * The journey as instructions a browser can follow.
+   *
+   * An assertion is a statement and a browser needs steps, so Scout emits
+   * both: the statement is what the finding argues about, these are how an
+   * agent gets to the state where it can be checked.
+   */
+  steps: z.array(z.string()).optional(),
   severity: Severity,
   /**
    * Non-negotiable. Every assertion cites the diff line or PR sentence that

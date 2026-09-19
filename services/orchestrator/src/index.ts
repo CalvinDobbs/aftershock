@@ -25,9 +25,19 @@ export {
 export { JsonlEventRepository } from "./jsonl-event-repository.js";
 export { resolveDataDirectory } from "./data-directory.js";
 export {
+  dispatch,
+  runFromCommit,
+  type CommitRunOptions,
+  type CommitRunOutcome,
+  type SkippedWork,
+} from "./commit-run.js";
+export {
+  CommitRunRequestSchema,
   createObservabilityHandler,
   createObservabilityServer,
   type DemoRun,
+  type CommitRunLauncher,
+  type CommitRunRequest,
   type DemoRunLauncher,
   type ObservabilityApiOptions,
 } from "./observability-api.js";
