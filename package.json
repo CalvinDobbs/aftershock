@@ -1,0 +1,14 @@
+{
+  "name": "aftershock",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Autonomous QA and repair for every commit.",
+  "engines": { "node": ">=20" },
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @aftershock/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r --if-present lint"
+  }
+}
