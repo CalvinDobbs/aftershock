@@ -33,6 +33,8 @@ export interface RunRecord {
    * the two halves of one run are unaddressable from each other.
    */
   orchestratorRunId: string | null;
+  /** Set from Verification.passed when Curtain Call finishes. Never inferred. */
+  verified: boolean;
   status: RunStatus;
   createdAt: string;
   startedAt: string | null;
@@ -74,6 +76,7 @@ export class InMemoryRunStore implements RunStore {
       previewUrl: input.previewUrl ?? null,
       baseUrl: input.baseUrl ?? null,
       orchestratorRunId: null,
+      verified: false,
       // Pending, not running: there is no deployment yet, and the dashboard
       // showing the run before any work starts is the demo's first beat.
       status: "pending",
@@ -129,5 +132,7 @@ export function toSummary(run: RunRecord): RunSummary {
     durationMs: duration,
     startedAt: run.startedAt ?? run.createdAt,
     prNumber: run.prNumber ?? null,
+    // Only Curtain Call can set this, and it has not run yet.
+    verified: run.verified,
   };
 }

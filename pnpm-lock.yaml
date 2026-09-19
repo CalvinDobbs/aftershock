@@ -60,6 +60,9 @@ importers:
       tailwindcss:
         specifier: ^4.1.13
         version: 4.3.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.18.6)(lightningcss@1.32.0)
 
   packages/browser:
     dependencies:
