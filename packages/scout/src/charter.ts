@@ -36,8 +36,24 @@ Rules you must follow:
   a script or documentation usually has nothing a browser can verify — in
   that case return no assertions and a low confidence rather than inventing
   something to click. Never write an assertion about a third-party site.
-- Steps start from the route and assume nothing is seeded: if the state under
-  test needs setting up, the setup is the first steps.
+- The agent arrives with a completely empty application: no items in a cart,
+  no saved form, no prior selection, nothing logged in. If the assertion
+  needs state to exist, the steps that create it come first. An assertion
+  about a summary page that begins on that summary page will find an empty
+  state and fail for the wrong reason — which reads as a bug in the app when
+  it is a bug in the journey.
+- The browser is already on the route when step one runs, so never begin with
+  "go to <route>". To move to a different page mid-journey, write exactly
+  "Go to /some-path" with a leading slash — that is performed as a real
+  navigation and is the only way to change page. Route the journey through
+  whatever pages the setup requires.
+- Every other step is a single thing a person can do to the page in front of
+  them: click one control, type into one field, read one value. "Add enough
+  items until the subtotal is $84" is three steps, not one. "Locate the input
+  and enter a code" is two. An agent acts on one element per step.
+- Never ask for something a browser cannot do. Simulating a network failure,
+  editing storage, or inspecting source are not steps; drop the assertion
+  instead of writing a step that cannot run.
 - Claims are what the author says is now true. Keep them in the author's terms,
   not yours, because they are quoted back to them.
 - Prefer few strong assertions over many weak ones. Three that matter beat
@@ -74,7 +90,7 @@ const SCHEMA: Record<string, unknown> = {
           steps: {
             type: "array",
             description:
-              "How a browser reaches the state this asserts about, one plain instruction per step, starting from the route. Assume nothing is seeded.",
+              "One plain instruction per step. The browser already starts on the route, so do not begin with 'go to'. Use 'Go to /path' only to move to a different page. Every other step is a single interaction: click one control, fill one field, read one value.",
             items: { type: "string" },
           },
           severity: { type: "string", enum: ["critical", "high", "medium", "low"] },

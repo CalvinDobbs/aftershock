@@ -8,7 +8,13 @@ import type {
   StepSnapshot,
 } from "@aftershock/schema/browser";
 
-import { normalise, normaliseTreeLine, pathAndQuery, volatileReason } from "./normalise.js";
+import {
+  isInjectedWidget,
+  normalise,
+  normaliseTreeLine,
+  pathAndQuery,
+  volatileReason,
+} from "./normalise.js";
 
 /**
  * The second oracle.
@@ -209,6 +215,21 @@ function treeDeltas(
 
   const classified = pairLines(removed, added).map(([from, to]) => {
       const field = fieldOf(from || to) || "tree";
+
+      // Platform chrome: a preview toolbar the production deployment has no
+      // reason to carry. Present on one side by construction, so it would
+      // otherwise be an unclaimed delta on every step of every run.
+      if (isInjectedWidget(from) || isInjectedWidget(to)) {
+        return {
+          stepIndex,
+          channel: "tree" as const,
+          field,
+          base: from || "—",
+          preview: to || "—",
+          classification: "noise" as const,
+          reason: "platform chrome, not the app under test",
+        };
+      }
 
       // Attribute-only churn and volatile text: the lines differ literally but
       // mean the same thing, so they are recorded as dismissed, not reported.

@@ -332,3 +332,36 @@ describe("compareResults", () => {
     expect(outcome.findings.some((f) => f.signature.includes("journey length"))).toBe(true);
   });
 });
+
+describe("platform chrome", () => {
+  it("does not report a preview toolbar as a regression", async () => {
+    // A Vercel preview carries a toolbar production has no reason to. It was
+    // two unclaimed deltas on every step of every differential run.
+    const { compareSnapshots } = await import("./comparator.js");
+    const deltas = compareSnapshots(
+      0,
+      snapshot({ url: "https://a.dev/cart", formattedTree: 'text "Subtotal $132.00"' }),
+      snapshot({
+        url: "https://b.dev/cart",
+        formattedTree: 'text "Subtotal $132.00"\nbutton "Vercel Toolbar"\nbutton "Open Next.js Dev Tools"',
+      }),
+    );
+    expect(deltas.filter((d) => d.classification === "unclaimed")).toHaveLength(0);
+    expect(deltas.every((d) => d.reason.includes("platform chrome"))).toBe(true);
+  });
+
+  it("still reports the app's own change on a page that has a toolbar", async () => {
+    const { compareSnapshots } = await import("./comparator.js");
+    const deltas = compareSnapshots(
+      0,
+      snapshot({ url: "https://a.dev/cart", formattedTree: 'text "Subtotal $132.00"' }),
+      snapshot({
+        url: "https://b.dev/cart",
+        formattedTree: 'text "Subtotal $NaN"\nbutton "Vercel Toolbar"',
+      }),
+    );
+    const unclaimed = deltas.filter((d) => d.classification === "unclaimed");
+    expect(unclaimed).toHaveLength(1);
+    expect(unclaimed[0]!.preview).toContain("$NaN");
+  });
+});

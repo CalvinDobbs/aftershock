@@ -17,6 +17,33 @@
  * against real runs rather than guesses.
  */
 
+/**
+ * Chrome the hosting platform injects into a preview but not production.
+ *
+ * A Vercel preview carries a toolbar the production deployment has no
+ * reason to; every step of every differential then reports two regressions
+ * that are an artefact of where the code is deployed, not of the code. The
+ * same is true of framework dev overlays.
+ *
+ * Matched against the accessible name, so it survives markup changes. Kept
+ * as a list rather than folded into the regex rules because a project may
+ * need to add its own, and because a delta dropped for this reason should
+ * say so by name.
+ */
+export const INJECTED_WIDGETS: readonly RegExp[] = [
+  /\bVercel Toolbar\b/i,
+  /\bNext\.js Dev Tools\b/i,
+  /\bOpen Next\.js Dev Tools\b/i,
+  /\bReact Developer Tools\b/i,
+  /\bvercel-(?:toolbar|live)\b/i,
+  /\bNext\.js (?:route announcer|logo)\b/i,
+];
+
+/** True when this line is platform chrome rather than the app under test. */
+export function isInjectedWidget(value: string): boolean {
+  return INJECTED_WIDGETS.some((pattern) => pattern.test(value));
+}
+
 export interface NoiseRule {
   name: string;
   pattern: RegExp;

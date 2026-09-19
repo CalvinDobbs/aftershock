@@ -71,10 +71,63 @@ function eventBase(assignment: Assignment, now: () => number) {
   };
 }
 
+/**
+ * Instructions that mean "be on this page" rather than "click this thing".
+ *
+ * A real journey spans routes — product, cart, checkout — and the harness
+ * only navigated once, at the start. Everything after that went through
+ * `observe`, which searches the accessibility tree for an element to act on
+ * and finds nothing for "Go to /checkout". Worse, it *sometimes* found a
+ * matching link, so the same journey passed or failed depending on whether
+ * the page happened to have one. Navigation is now deterministic: no
+ * inference, no variance, and free.
+ */
+const NAVIGATION = /^(?:go|navigate|head|proceed)\s+(?:to|back to)\s+(?:the\s+)?(\/\S*)|^(?:open|visit|load)\s+(?:the\s+)?(\/\S*)/i;
+
+export function navigationTarget(instruction: string): string | null {
+  const match = instruction.trim().match(NAVIGATION);
+  const path = match?.[1] ?? match?.[2];
+  return path ? path.replace(/[.,;]$/, "") : null;
+}
+
+/** The Action a navigation records, so replay reproduces it exactly. */
+function gotoAction(path: string, instruction: string): Action {
+  return { method: "goto", description: instruction, selector: "", arguments: [path] };
+}
+
 function replayAction(assignment: Assignment, index: number): Action {
   const action = assignment.journey[index]?.action;
   if (!action) throw new Error(`Replay requires a persisted action for step ${index}`);
   return action;
+}
+
+const NO_INFERENCE = {
+  inputTokens: 0,
+  outputTokens: 0,
+  reasoningTokens: 0,
+  cachedInputTokens: 0,
+  inferenceTimeMs: 0,
+};
+
+/**
+ * One retry on a failed plan.
+ *
+ * The PRD's rule: escalate on `observe`, never on `act`. A failed `act` may
+ * already have clicked before the error surfaced, so retrying repeats the
+ * side effect; `observe` only plans, so retrying is free. Pages that are
+ * still hydrating are the common case, and losing a whole assignment to one
+ * early look is expensive.
+ */
+async function observeWithRetry(
+  session: BrowserSession,
+  instruction: string,
+  index: number,
+): Promise<Awaited<ReturnType<BrowserSession["stagehand"]["observe"]>>> {
+  const first = await session.stagehand.observe(instruction);
+  if (first.data[0]) return first;
+  await session.page.waitForTimeout(800);
+  void index;
+  return session.stagehand.observe(instruction);
 }
 
 async function closeSession(
@@ -130,9 +183,32 @@ export async function runAssignment(options: RunAssignmentOptions) {
     for (const [index, journeyStep] of assignment.journey.entries()) {
       let action: Action;
 
-      if (mode === "plan") {
+      // Navigation is resolved before any inference: it is deterministic,
+      // costs nothing, and is the one instruction `observe` cannot serve.
+      const navigateTo =
+        mode === "plan"
+          ? navigationTarget(journeyStep.instruction)
+          : replayAction(assignment, index).method === "goto"
+            ? (replayAction(assignment, index).arguments?.[0] ?? null)
+            : null;
+
+      if (navigateTo !== null) {
+        const navStartedAt = now();
+        await session.page.goto(new URL(navigateTo, targetUrl).toString(), {
+          waitUntil: "domcontentloaded",
+        });
+        action = gotoAction(navigateTo, journeyStep.instruction);
+        await emit({
+          ...eventBase(assignment, now),
+          type: "step.executed",
+          index,
+          action,
+          usage: NO_INFERENCE,
+          durationMs: now() - navStartedAt,
+        });
+      } else if (mode === "plan") {
         const planStartedAt = now();
-        const observed = await session.stagehand.observe(journeyStep.instruction);
+        const observed = await observeWithRetry(session, journeyStep.instruction, index);
         const candidate = observed.data[0];
         if (!candidate) {
           throw new Error(`Stagehand found no action for step ${index}: ${journeyStep.instruction}`);
@@ -153,17 +229,19 @@ export async function runAssignment(options: RunAssignmentOptions) {
         action = replayAction(assignment, index);
       }
 
-      const actionStartedAt = now();
-      const acted = await session.stagehand.act(action);
-      await emit({
-        ...eventBase(assignment, now),
-        type: "step.executed",
-        index,
-        action,
-        ...(acted.metadata.actionId ? { actionId: acted.metadata.actionId } : {}),
-        usage: acted.metadata.usage,
-        durationMs: now() - actionStartedAt,
-      });
+      if (navigateTo === null) {
+        const actionStartedAt = now();
+        const acted = await session.stagehand.act(action);
+        await emit({
+          ...eventBase(assignment, now),
+          type: "step.executed",
+          index,
+          action,
+          ...(acted.metadata.actionId ? { actionId: acted.metadata.actionId } : {}),
+          usage: acted.metadata.usage,
+          durationMs: now() - actionStartedAt,
+        });
+      }
 
       const captureStartedAt = now();
       if (settleMs > 0) await session.page.waitForTimeout(settleMs);

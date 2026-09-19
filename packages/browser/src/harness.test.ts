@@ -178,3 +178,26 @@ describe("runAssignment", () => {
     expect(session.close).toHaveBeenCalledOnce();
   });
 });
+
+describe("navigationTarget", () => {
+  it("recognises the instructions observe cannot serve", async () => {
+    const { navigationTarget } = await import("./harness.js");
+    // A journey spans pages. These used to go through observe, which looks
+    // for an element to click and finds nothing — or worse, sometimes finds
+    // a matching link, so the same journey passed or failed by luck.
+    expect(navigationTarget("Go to /checkout")).toBe("/checkout");
+    expect(navigationTarget("go to the /cart")).toBe("/cart");
+    expect(navigationTarget("Navigate to /products/wool-scarf")).toBe("/products/wool-scarf");
+    expect(navigationTarget("Open /cart.")).toBe("/cart");
+    expect(navigationTarget("Proceed to /checkout")).toBe("/checkout");
+  });
+
+  it("leaves real interactions to the model", async () => {
+    const { navigationTarget } = await import("./harness.js");
+    expect(navigationTarget("Click the add to cart button")).toBeNull();
+    expect(navigationTarget("Open the cart")).toBeNull();
+    expect(navigationTarget("Enter SAVE20 into the coupon field")).toBeNull();
+    // No path means we cannot navigate deterministically; observe can still try.
+    expect(navigationTarget("Go to the checkout page")).toBeNull();
+  });
+});
