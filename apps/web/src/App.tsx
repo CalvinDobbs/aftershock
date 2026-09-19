@@ -113,10 +113,18 @@ export default function App() {
           <button
             type="button"
             className="primary"
+            aria-label={launching ? "Launching Browserbase run" : "Launch Browserbase run"}
             onClick={() => void launch()}
             disabled={launching}
           >
-            {launching ? "Launching…" : "Launch Browserbase Run"}
+            {launching ? (
+              "Launching…"
+            ) : (
+              <>
+                <span className="launch-label-full">Launch Browserbase Run</span>
+                <span className="launch-label-compact">Launch Run</span>
+              </>
+            )}
           </button>
         </div>
       </header>

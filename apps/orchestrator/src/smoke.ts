@@ -1,5 +1,6 @@
 import { AssignmentSchema } from "@aftershock/schema";
 
+import { resolveDataDirectory } from "./data-directory.js";
 import { createObservabilityRuntime } from "./runtime.js";
 
 const apiKey = process.env.BROWSERBASE_API_KEY;
@@ -13,7 +14,9 @@ if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
 
 const runId = `observability-smoke-${Date.now()}`;
 const assignmentId = "smoke-stagehand";
-const dataDirectory = process.env.AFTERSHOCK_DATA_DIR ?? ".aftershock/smoke";
+const dataDirectory = resolveDataDirectory(
+  process.env.AFTERSHOCK_DATA_DIR ?? ".aftershock/smoke",
+);
 
 const runtime = createObservabilityRuntime({ dataDirectory, browserbaseApiKey: apiKey });
 const controller = new AbortController();

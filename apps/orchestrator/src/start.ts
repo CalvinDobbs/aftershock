@@ -1,3 +1,4 @@
+import { resolveDataDirectory } from "./data-directory.js";
 import { createObservabilityRuntime } from "./runtime.js";
 
 const apiKey = process.env.BROWSERBASE_API_KEY;
@@ -8,7 +9,7 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   throw new Error(`Invalid PORT: ${process.env.PORT}`);
 }
 
-const dataDirectory = process.env.AFTERSHOCK_DATA_DIR ?? ".aftershock";
+const dataDirectory = resolveDataDirectory();
 const runtime = createObservabilityRuntime({ dataDirectory, browserbaseApiKey: apiKey });
 
 runtime.server.listen(port, "127.0.0.1", () => {

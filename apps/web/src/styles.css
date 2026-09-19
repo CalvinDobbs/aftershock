@@ -23,6 +23,7 @@ body,
 
 body {
   background: var(--bg);
+  overflow-x: hidden;
   color: var(--text);
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
@@ -84,6 +85,10 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: #ff7259;
   border-color: #ff7259;
+}
+
+.launch-label-compact {
+  display: none;
 }
 
 :focus-visible {
@@ -690,6 +695,59 @@ button.primary:hover:not(:disabled) {
 }
 
 @media (max-width: 600px) {
+  .topbar {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .brand {
+    min-width: 0;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .brand h1 {
+    font-size: 14px;
+    letter-spacing: 0.16em;
+  }
+
+  .brand p,
+  .topbar-controls .conn {
+    display: none;
+  }
+
+  .topbar-controls {
+    margin-left: auto;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .launch-label-full {
+    display: none;
+  }
+
+  .launch-label-compact {
+    display: inline;
+  }
+
+  .topbar-controls .primary {
+    white-space: nowrap;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .rail {
+    padding: 14px;
+  }
+
+  .empty-state {
+    width: 100%;
+    padding: 56px 8px;
+  }
+
   .metric-grid {
     grid-template-columns: repeat(2, 1fr);
   }

@@ -5,6 +5,7 @@ export {
   type EventRepository,
 } from "./event-stream.js";
 export { JsonlEventRepository } from "./jsonl-event-repository.js";
+export { resolveDataDirectory } from "./data-directory.js";
 export {
   createObservabilityHandler,
   createObservabilityServer,
