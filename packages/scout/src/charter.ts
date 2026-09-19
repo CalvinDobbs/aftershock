@@ -18,13 +18,26 @@ const SYSTEM = `You are Scout, the first stage of an automated QA system.
 You read a commit and decide what a browser should check. You never write code
 and you never run anything; you produce a specification other agents execute.
 
+The app could be anything a browser can open — a dashboard, an admin console,
+a booking flow, a document editor, a storefront, a settings page. Take the
+domain from the diff in front of you and do not assume one.
+
 Rules you must follow:
 
 - Every assertion cites the exact diff line, file:line, or sentence of the PR
   body that produced it. An assertion you cannot source is one you must not
   write. This citation is shown to the developer, so it must be real.
-- Write assertions a person could check by using the app. "The coupon field
-  reduces the total" is checkable. "The code is correct" is not.
+- Write assertions a person could check by looking at the running app.
+  Checkable: "submitting an empty form shows a validation message", "the
+  filter reduces the row count", "the export button downloads a file".
+  Not checkable: "the code is correct", "performance is improved", "the
+  refactor is clean".
+- Only assert about pages this app serves. A change to a README, a CI config,
+  a script or documentation usually has nothing a browser can verify — in
+  that case return no assertions and a low confidence rather than inventing
+  something to click. Never write an assertion about a third-party site.
+- Steps start from the route and assume nothing is seeded: if the state under
+  test needs setting up, the setup is the first steps.
 - Claims are what the author says is now true. Keep them in the author's terms,
   not yours, because they are quoted back to them.
 - Prefer few strong assertions over many weak ones. Three that matter beat
@@ -97,8 +110,8 @@ export interface InferCharterInput {
  * The app's primary end-to-end journey, configured per project.
  *
  * It has to be configured rather than inferred: a model asked to test a
- * coupon feature will not think to re-check checkout, and that is precisely
- * the journey where an unnoticed regression does the most damage.
+ * feature will not think to re-exercise the journey around it, and that is
+ * precisely where an unnoticed regression does the most damage.
  */
 export interface CriticalJourney {
   description: string;
@@ -148,8 +161,9 @@ function freeId(assertions: readonly Assertion[], preferred: string): string {
  *
  * The conformance oracle can only check what the author thought to mention.
  * This one needs no intent at all, which is why it is added here rather than
- * left to the model's judgement — a model asked to test a coupon feature will
- * not think to re-check checkout, and that is the finding that matters.
+ * left to the model's judgement — a model asked to test one feature will not
+ * think to re-exercise the journey around it, and that is the finding that
+ * matters.
  */
 export function withCriticalPath(
   assertions: Assertion[],

@@ -15,23 +15,55 @@ export type AssignmentStatus = z.infer<typeof AssignmentStatus>;
  * The typed visible-text digest captured after each action.
  *
  * This is the PRD's "visible text digest — `extract` with a fixed schema"
- * (Stage 2 > state snapshot). It is what the differential comparator diffs, so
- * it exists whether or not anyone renders it; the dashboard reuses it to draw
- * a faithful page render when a screenshot has not uploaded yet, and to show
- * preview and base side by side.
+ * (Stage 2 > state snapshot). It is what the differential comparator diffs,
+ * so it exists whether or not anyone renders it; the dashboard reuses it to
+ * draw a faithful page render when a screenshot has not uploaded yet.
+ *
+ * The shape is deliberately app-agnostic. An earlier version modelled a
+ * receipt — brand, line items, a total — which described a checkout page and
+ * nothing else. A dashboard has KPIs, a settings page has toggles, a login
+ * form has validation messages, and none of them have a total. These four
+ * buckets cover all of them:
+ *
+ *   fields    labelled values the page is displaying
+ *   notices   anything the app is telling the user right now
+ *   controls  what the user can interact with, and its current state
+ *   primary   the one value this assertion is actually about
+ *
+ * `primary` is what a finding quotes ("read $84.00, expected $67.20" — or
+ * "read 0 results, expected 12"), so it is worth pulling out of `fields`.
  */
+export const DigestField = z.object({
+  label: z.string(),
+  value: z.string(),
+});
+export type DigestField = z.infer<typeof DigestField>;
+
+export const DigestNotice = z.object({
+  text: z.string(),
+  tone: z.enum(['info', 'ok', 'error']),
+});
+export type DigestNotice = z.infer<typeof DigestNotice>;
+
+export const DigestControl = z.object({
+  kind: z.enum(['input', 'button', 'link', 'toggle', 'select']),
+  label: z.string(),
+  /** Current state: what is typed, whether a toggle is on, what is selected. */
+  value: z.string().optional(),
+});
+export type DigestControl = z.infer<typeof DigestControl>;
+
 export const VisibleDigest = z.object({
   route: z.string(),
-  /** Store name / page heading. */
-  brand: z.string().optional(),
-  /** Small top-right note, e.g. "Cart · 1". */
+  /** The page's own heading, however the app titles itself. */
+  title: z.string().optional(),
+  /** A short secondary line: a count, a status, a breadcrumb. */
   meta: z.string().optional(),
-  lines: z.array(z.object({ label: z.string(), value: z.string() })),
-  notice: z.object({ text: z.string(), tone: z.enum(['ok', 'error']) }).optional(),
-  /** A single input the assertion cares about, e.g. the coupon field. */
-  field: z.object({ label: z.string(), value: z.string() }).optional(),
-  action: z.string().optional(),
-  total: z.object({ label: z.string(), value: z.string() }).optional(),
+  fields: z.array(DigestField).default([]),
+  notices: z.array(DigestNotice).default([]),
+  controls: z.array(DigestControl).default([]),
+  /** The single value the assertion concerns, if there is one. */
+  primary: DigestField.optional(),
   /** True when this frame is the one the finding is about. */
   flagged: z.boolean().default(false),
 });

@@ -125,7 +125,8 @@ function evidencePair(a: Assignment): { before?: Step; after?: Step } {
   return { before, after };
 }
 
-const valueOf = (s?: Step) => s?.digest?.total?.value;
+/** The one value this step's assertion is about, whatever the app calls it. */
+const valueOf = (s?: Step) => s?.digest?.primary?.value;
 
 /** PLACEHOLDER — read out of the agent's step label; see expectedLabel note. */
 const expectedOf = (s?: Step) => s?.label.match(/expected\s+([^)]+?)\)?\s*$/i)?.[1]?.trim();
@@ -287,7 +288,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     } else if (valueOf(before) && valueOf(after)) {
       attachments.push({
         kind: 'values',
-        label: after?.digest?.total?.label ?? 'value',
+        label: after?.digest?.primary?.label ?? 'value',
         before: valueOf(before)!,
         after: valueOf(after)!,
         ...(expectedOf(after) ? { expected: expectedOf(after) } : {}),

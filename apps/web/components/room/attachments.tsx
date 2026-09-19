@@ -73,7 +73,11 @@ function AssertionRows({ rows }: { rows: { id: string; statement: string; source
  *
  * The recording is already in the browsers row above; repeating it as a pair
  * of page mocks says the same thing twice and doubles the height of the
- * message. Two numbers side by side make the argument faster.
+ * message. Two values side by side make the argument faster.
+ *
+ * Deliberately app-agnostic. The value is whatever the assertion was about —
+ * an order total, a result count, a queue depth, a toggle's state — so the
+ * labels are "before"/"after" and never anything domain-shaped.
  */
 function ValueReadout({
   label,
@@ -90,11 +94,11 @@ function ValueReadout({
     <div className="mt-[9px] flex flex-wrap items-baseline gap-x-3 gap-y-1.5 rounded-[11px] bg-card-2 px-3.5 py-3">
       <span className="text-[12px]/[1] text-ink-8">{label}</span>
       <span className="mono text-[13px]/[1] text-ink-4">{before}</span>
-      <span className="text-[12px]/[1] text-ink-8">after apply</span>
+      <span className="text-[12px]/[1] text-ink-8">then</span>
       <span className="mono text-[13px]/[1] font-medium text-alarm">{after}</span>
       {expected && (
         <>
-          <span className="text-[12px]/[1] text-ink-8">should read</span>
+          <span className="text-[12px]/[1] text-ink-8">expected</span>
           <span className="mono text-[13px]/[1] text-plus">{expected.replace(/^expected\s+/i, '')}</span>
         </>
       )}

@@ -79,6 +79,29 @@ about a 404 we caused is noise. The assertion is skipped with a reason.
 `criticalJourney` and `fallbackRoutes` are per-project and should be
 configured. The defaults are deliberately generic and marked `PLACEHOLDER`.
 
+## This is not an e-commerce tool
+
+Nothing in the pipeline assumes a domain. The demo app is a storefront because
+commerce has the clearest broken/working signal, but the contracts are shaped
+for any app a browser can open.
+
+The one place that used to assume one was `VisibleDigest`, which modelled a
+receipt — a brand, line items and a total. It is now four app-agnostic
+buckets: `fields` (labelled values), `notices` (what the app is telling the
+user), `controls` (what can be interacted with, and its state) and `primary`
+(the one value the assertion is about). A dashboard KPI, a validation
+message, a settings toggle and an order total all fit.
+
+Scout's prompt says the same thing out loud, and it changes behaviour. On a
+README-only commit it used to invent an assertion about clicking a button on
+GitHub; it now returns none and scores the risk at 0.05. On a data-grid
+library it produces assertions about feed status, sample-rate sliders and row
+counts, with no commerce vocabulary anywhere.
+
+Two things remain framework-shaped rather than domain-shaped, and that is
+deliberate: route mapping knows Next.js conventions (`app/`, `pages/`), and
+falls back to configured primary journeys for anything else.
+
 ## Known gaps
 
 - **No import graph.** The PRD's second route strategy walks importers of a
