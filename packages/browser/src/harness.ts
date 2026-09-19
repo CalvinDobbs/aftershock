@@ -152,13 +152,14 @@ export async function runAssignment(options: RunAssignmentOptions) {
     targetUrl,
     mode,
     side,
-    emit,
+    emit: send,
     writeScreenshot,
     config = loadBrowserConfig(),
     sessionFactory = launchBrowserSession,
     now = Date.now,
     settleMs = 400,
   } = options;
+  const emit: RunAssignmentOptions["emit"] = (event) => send({ ...event, side });
 
   const startedAtMs = now();
   const startedAt = new Date(startedAtMs).toISOString();

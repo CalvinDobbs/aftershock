@@ -3,7 +3,7 @@ import type {
   AssignmentResult,
   DifferentialResult,
 } from "@aftershock/schema/browser";
-import type { Finding, RunEvent, TestCharter } from "@aftershock/schema";
+import { RunDetail, type Commit, type Finding, type Run, type RunEvent, type Stage, type TestCharter } from "@aftershock/schema";
 import { isReplayable, withRecordedActions } from "@aftershock/browser";
 import { authorIssue, judge, selectIssues, type IssueDraft } from "@aftershock/critic";
 import {
@@ -23,6 +23,7 @@ import { runObservableAssignment } from "./assignment-runner.js";
 import { runObservableDifferential } from "./differential-runner.js";
 import type { RunEventStream } from "./event-stream.js";
 import type { ScreenshotRepository } from "./screenshot-repository.js";
+import { initialRun, queuedAssignment, completedAssignment } from "./pipeline-projection.js";
 
 /**
  * The Director, in the shape the PRD describes: one commit in, a fleet of
@@ -60,6 +61,9 @@ export interface CommitRunOptions {
   model?: CharterModel;
   /** Shauraya's API/persistence consumes these product events, separate from browser telemetry. */
   emitPipelineEvent?: (event: RunEvent) => void | Promise<void>;
+  commitMetadata?: Pick<Commit, "author" | "branch">;
+  /** API owner supplies its public evidence URL; default is the runtime path. */
+  screenshotUrl?: (id: string) => string;
 }
 
 /**
@@ -87,22 +91,31 @@ export interface CommitRunOutcome {
   findings: Finding[];
   /** Unpublished: the Director's GitHub integration supplies real issue numbers/URLs. */
   issueDrafts: IssueDraft[];
+  detail: RunDetail;
 }
 
 /** A differential holds two slots; everything else holds one. */
 const cost = (assignment: Assignment) => (assignment.archetype === "differential" ? 2 : 1);
 
 export async function runFromCommit(options: CommitRunOptions): Promise<CommitRunOutcome> {
+  const run = initialRun(options);
   try {
-    return await executeCommitRun(options);
+    await options.emitPipelineEvent?.({ type: "run.snapshot", run: structuredClone(run) });
+    return await executeCommitRun(options, run);
   } catch (error) {
+    run.status = "failed";
+    run.finishedAt = new Date().toISOString();
+    for (const stage of run.stages) {
+      if (stage.status === "running") { stage.status = "failed"; stage.finishedAt = run.finishedAt; }
+    }
+    await options.emitPipelineEvent?.({ type: "run.snapshot", run: structuredClone(run) });
     await options.emitPipelineEvent?.({ type: "run.failed",
       reason: error instanceof Error ? error.message : String(error) });
     throw error;
   }
 }
 
-async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOutcome> {
+async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<CommitRunOutcome> {
   const {
     runId,
     previewUrl,
@@ -112,7 +125,21 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
     github = new GitHubClient({ ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}) }),
   } = options;
 
-  const publish = async (event: RunEvent) => { await options.emitPipelineEvent?.(event); };
+  const publish = async (event: RunEvent) => {
+    const completed: Partial<Record<RunEvent["type"], Stage>> = {
+      "scout.complete": "scout", "cast.complete": "cast", "critic.complete": "critic",
+    };
+    const stageName = event.type === "stage.start" || event.type === "stage.skip" ? event.stage : completed[event.type];
+    const stage = run.stages.find((s) => s.stage === stageName);
+    if (stage) {
+      const now = new Date().toISOString();
+      stage.status = event.type === "stage.start" ? "running" : event.type === "stage.skip" ? "skipped" : "complete";
+      if (event.type === "stage.start") stage.startedAt = now;
+      else stage.finishedAt = now;
+      if (event.type === "stage.skip") stage.note = event.note;
+    }
+    await options.emitPipelineEvent?.(structuredClone(event));
+  };
   await publish({ type: "stage.start", stage: "scout" });
 
   const intent = await github.readIntent({
@@ -121,6 +148,12 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
     head: options.head,
     ...(options.prNumber !== undefined ? { prNumber: options.prNumber } : {}),
   });
+  run.commit = { ...run.commit, sha: intent.headSha, message: intent.messages.at(-1) ?? "No commit message",
+    filesChanged: intent.files.length,
+    additions: intent.files.reduce((sum, file) => sum + file.additions, 0),
+    deletions: intent.files.reduce((sum, file) => sum + file.deletions, 0),
+    ...(intent.prTitle ? { prTitle: intent.prTitle } : {}) };
+  await publish({ type: "run.snapshot", run });
 
   const surfaces = mapRoutes(intent.files, {
     ...(options.fallbackRoutes ? { fallbackRoutes: options.fallbackRoutes } : {}),
@@ -143,6 +176,7 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
   } catch {
     charter = smokeCharter(charterInput);
   }
+  run.riskScore = charter.riskScore;
   await publish({ type: "scout.complete", charter });
   await publish({ type: "stage.start", stage: "cast" });
 
@@ -151,6 +185,8 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
     ...(options.routeSamples ? { routeSamples: options.routeSamples } : {}),
     ...(options.routeSetup ? { routeSetup: options.routeSetup } : {}),
   });
+  const productAssignments = new Map(assignments.map((assignment) => [assignment.id, queuedAssignment(assignment)]));
+  await publish({ type: "cast.dispatch", assignments: [...productAssignments.values()] });
 
   // Risk drives the fleet: a one-line CSS change does not deserve the same
   // number of browsers as a change to payment logic.
@@ -173,41 +209,47 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
   }));
 
   const runOne = async (assignment: Assignment): Promise<void> => {
+    if (assignment.archetype === "differential" && !baseUrl) {
+      allSkipped.push({ id: assignment.id, stage: "dispatch", reason: "no base deployment to compare against" });
+      return;
+    }
+    const product = productAssignments.get(assignment.id)!;
+    product.status = "running";
+    product.startedAt = new Date().toISOString();
+    await publish({ type: "agent.update", assignment: product });
+    let result: AssignmentResult | DifferentialResult | undefined;
+    let failure: string | undefined;
+    try {
     if (assignment.archetype === "differential") {
-      if (!baseUrl) {
-        // Base URL resolution failed. Differential is the stronger oracle, so
-        // losing it matters — but the run continues with conformance rather
-        // than failing, and the reason is surfaced.
-        allSkipped.push({
-          id: assignment.id,
-          stage: "dispatch",
-          reason: "no base deployment to compare against",
-        });
-        return;
-      }
-      differential.push(
-        await runObservableDifferential({
+      result = await runObservableDifferential({
           assignment,
           previewUrl,
-          baseUrl,
+          baseUrl: baseUrl!,
           claims: charter.intent.claims,
           eventStream,
           screenshotRepository,
-        }),
-      );
+        });
+      differential.push(result);
       return;
     }
 
-    conformance.push(
-      await runObservableAssignment({
+    result = await runObservableAssignment({
         assignment,
         targetUrl: previewUrl,
         mode: "plan",
         side: "preview",
         eventStream,
         screenshotRepository,
-      }),
-    );
+      });
+    conformance.push(result);
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      const projected = completedAssignment(assignment, await eventStream.history(runId), result, failure, options.screenshotUrl);
+      productAssignments.set(assignment.id, projected);
+      await publish({ type: "agent.update", assignment: projected });
+    }
   };
 
   await dispatch(dispatchOrder(assignments), maxConcurrent, runOne, allSkipped, budgetSource);
@@ -219,6 +261,13 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
   // Run-stage skips are excluded: the harness already emitted `session.failed`
   // for those, and repeating them reads as two separate problems.
   for (const gap of allSkipped.filter((g) => g.stage !== "run")) {
+    const assignment = productAssignments.get(gap.id);
+    if (assignment) {
+      assignment.status = "skipped";
+      assignment.finishedAt = new Date().toISOString();
+      assignment.trace.push({ seq: assignment.trace.length, at: assignment.finishedAt, content: gap.reason });
+      await publish({ type: "agent.update", assignment });
+    }
     await eventStream.publish({
       runId,
       assignmentId: gap.id,
@@ -256,7 +305,21 @@ async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOut
   });
   await publish({ type: "critic.complete", findings });
   const issueDrafts = await Promise.all(selectIssues(findings).map(authorIssue));
-  return { charter, assignments, conformance, differential, skipped: allSkipped, findings, issueDrafts };
+  for (const stage of ["sleuth", "understudy", "curtain_call"] as const) {
+    await publish({ type: "stage.skip", stage, note: issueDrafts.length
+      ? "Confirmed findings retained; GitHub filing and repair integration are not connected yet."
+      : "No confirmed issue to repair." });
+  }
+  const incomplete = [...productAssignments.values()].filter((a) => a.status === "errored" || a.status === "skipped").length + skipped.length;
+  if (incomplete || assignments.length === 0) {
+    run.stages.find((s) => s.stage === "cast")!.note = `${incomplete} incomplete assignments; ${assignments.length} assignments planned. Coverage is partial.`;
+  }
+  run.status = findings.some((f) => f.status === "confirmed") || incomplete || assignments.length === 0 ? "complete" : "no_findings";
+  run.finishedAt = new Date().toISOString();
+  await publish({ type: "run.complete", run });
+  const detail = RunDetail.parse({ run, charter, assignments: [...productAssignments.values()], findings,
+    issues: [], diagnosis: null, patch: null, verification: null, pullRequest: null });
+  return { charter, assignments, conformance, differential, skipped: allSkipped, findings, issueDrafts, detail };
 }
 
 /**

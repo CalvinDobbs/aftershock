@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RunEvent, type RunEvent as PipelineEvent } from "@aftershock/schema";
+import { RunDetail, RunEvent, type RunEvent as PipelineEvent } from "@aftershock/schema";
 import { DifferentialResultSchema } from "@aftershock/schema/browser";
 import { GitHubClient } from "@aftershock/scout";
 import { runFromCommit } from "./commit-run.js";
@@ -33,6 +33,13 @@ function setup() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("Director and Critic integration", () => {
+  it("finishes without false success when the base deployment is unavailable", async () => {
+    const outcome = await runFromCommit({ ...setup(), baseUrl: null });
+    expect(outcome.detail.assignments[0]?.status).toBe("skipped");
+    expect(outcome.detail.run.status).toBe("complete");
+    expect(outcome.detail.run.stages.find((s) => s.stage === "cast")?.note).toContain("partial");
+    expect(events.at(-1)?.type).toBe("run.complete");
+  });
   it("emits failure when GitHub fails before browser dispatch", async () => {
     const options = setup();
     vi.mocked(GitHubClient.prototype.readIntent).mockRejectedValueOnce(new Error("GitHub unavailable"));
@@ -48,7 +55,13 @@ describe("Director and Critic integration", () => {
     expect(replay.assignment.journey[0]?.action?.method).toBe("goto");
     expect(outcome.findings[0]).toMatchObject({ status: "confirmed", confidence: 0.8625, reproCount: 2, filed: false });
     expect(outcome.issueDrafts).toHaveLength(1);
-    expect(events.map((e) => e.type)).toEqual(["stage.start", "scout.complete", "stage.start", "cast.complete", "stage.start", "critic.complete"]);
+    expect(events.map((e) => e.type)).toEqual(["run.snapshot", "stage.start", "run.snapshot", "scout.complete", "stage.start", "cast.dispatch", "agent.update", "agent.update", "cast.complete", "stage.start", "critic.complete", "stage.skip", "stage.skip", "stage.skip", "run.complete"]);
+    expect(RunDetail.safeParse(outcome.detail).success).toBe(true);
+    expect(outcome.detail.assignments[0]?.status).toBe("failed");
+    expect(outcome.detail.run.stages.filter((s) => s.status === "running")).toEqual([]);
+    // Events delivered earlier must remain historical snapshots, not mutated objects.
+    const dispatched = events.find((e) => e.type === "cast.dispatch");
+    expect(dispatched?.type === "cast.dispatch" && dispatched.assignments[0]?.status).toBe("queued");
   });
 
   it("withholds an issue when the second run is clean", async () => {

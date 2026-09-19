@@ -187,6 +187,8 @@ const EventEnvelopeSchema = z.object({
   runId: z.string(),
   assignmentId: z.string(),
   timestamp: z.string().datetime(),
+  /** Explicit attribution when preview and base steps interleave. */
+  side: z.enum(["preview", "base", "fix"]).optional(),
 });
 
 const InferenceUsageSchema = z.object({

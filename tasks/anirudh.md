@@ -327,19 +327,22 @@ Current implementation is a tested FIRST CHECKPOINT, not the complete repair loo
   `onCommitRunComplete(runId, outcome)` into `createObservabilityRuntime`.
   `runFromCommit` takes `emitPipelineEvent(event)` directly. No web/API or
   event-repository implementation files were edited.
-- Current product events: Scout/Cast/Critic `stage.start` and completion, plus
-  `run.failed` on fatal errors. Full `run.snapshot`, `cast.dispatch`,
-  `agent.update`, and `run.complete` projection are NEXT. The existing dashboard
-  still uses its fixture; this checkpoint does not claim a working room bridge.
+- Product events now include `run.snapshot`, `cast.dispatch`, `agent.update`,
+  `run.complete`, Scout/Cast/Critic stages, explicit repair-stage skips, and
+  `run.failed`. Outcomes include validated `detail: RunDetail`. Browser telemetry
+  carries explicit base/preview side so concurrent evidence is paired correctly.
+  The existing dashboard still uses its fixture; Shauraya must connect callbacks
+  to persistence/SSE. No competing API or persistence layer was added.
 - `DifferentialResult` now optionally includes `recordedAssignment` (only a
   complete captured journey) and `completed`. Old records still parse. `Finding`
   optionally retains raw `evidence` strings for issue authoring.
 
 ### Next steps, in order
 
-1. Finish the Director's product Run/Assignment projection and stage events;
-   coordinate the existing runtime callbacks with Shauraya's run API. Keep edits
-   in Anirudh-owned files; do not implement a competing API or persistence layer.
+1. Connect the completed product projection callbacks with Shauraya's run API.
+   `onCommitRunComplete` receives `outcome.detail`; `emitPipelineEvent` receives
+   validated room events. `runFromCommit` optionally accepts `commitMetadata`
+   and `screenshotUrl`; unknown authors stay explicitly unknown.
 2. Implement conformance assertion evaluation in the browser package. The user
    confirmed the coupon bug manually, but the harness still captures without
    grading it. Then wire actual base observations into the Critic's pre-existing
@@ -355,3 +358,33 @@ no direct main pushes. Do not spend this lane on sidebar or budget/reaper work.
 
 Unrelated untracked `Meridian prd.md` appeared during this session; it belongs
  to the user's work and is intentionally excluded from the checkpoint commit.
+
+
+### Director projection checkpoint (September 19)
+
+- Added `pipeline-projection.ts` and five focused tests; Director now returns
+  schema-valid room details with real sessions, action timings, paired screenshots,
+  network/console evidence, terminal assignment states, and stage timestamps.
+- Queued events are cloned so later updates cannot rewrite dispatch history.
+- Conformance capture without an evaluator is `skipped`, never `passed`.
+  Missing base/incomplete comparisons remain visible coverage gaps. Unconnected
+  repair stages explicitly skip; no issue numbers, repairs, or success are invented.
+- `pnpm check` passed all typechecks and 182 tests before the final missing-base
+  event cleanup. Focused checks will be repeated for that cleanup.
+- New `director-smoke.ts` exercises the actual HTTP commit-run endpoint, GitHub
+  Scout, Browserbase, Critic, and product projections. The first live run completed
+  the pipeline but the script expected the wrong response envelope (`runId` instead
+  of `run.runId`); corrected and rerunning. Artifacts are ignored under `.aftershock`.
+- Final live endpoint test passed: `run-1789848634511-0`, 23 product events,
+  actual paired evidence in `detail.json` and `pipeline-events.json` under
+  `.aftershock/run-1789848634511-0/`. Cart `$84.00` -> `$NaN` reproduced 2/2.
+  The real Scout run classifies it LOW CONFIDENCE (0.5125): route confidence
+  penalty -0.15 and fallback/not-traced penalty -0.20. Do not lower thresholds
+  or claim a confirmed end-to-end result; improve evidence-backed route mapping.
+- A1/A2 completed browser journeys but remain skipped without assertion grading.
+  A3/A4 errored because their generated journeys request a nonexistent Remove
+  coupon button. Keep this distinction visible when implementing conformance.
+- Focused final orchestrator typecheck and all 54 tests passed after missing-base
+  cleanup. No main pushes, external issue filing, or demo repo changes.
+- Next implementation priorities: conformance evaluator and evidence-backed route
+  mapping; dashboard persistence/SSE remains Shauraya's integration seam.

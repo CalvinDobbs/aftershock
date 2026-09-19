@@ -10,7 +10,7 @@
  * Commit runs dispatch through a weighted semaphore, then the Critic replays
  * candidates and returns findings plus unpublished issue drafts. Product-stage
  * events use an injectable sink, separate from browser telemetry. The API run
- * projection and repair stages are still to land.
+ * persistence bridge and repair integrations are still to land.
  */
 export {
   InMemoryEventRepository,
