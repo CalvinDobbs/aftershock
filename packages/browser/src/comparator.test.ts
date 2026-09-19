@@ -231,6 +231,30 @@ describe("findingsFrom", () => {
     expect(findings[0]!.evidence).toContain("seen on 3 steps");
   });
 
+  it("reports a diverged journey once, not once per element", () => {
+    // A real run against two genuinely different deployments raised thirteen
+    // findings where the honest answer is one: the journey went somewhere
+    // else, and everything on the new page follows from that.
+    const findings = findingsFrom([
+      { stepIndex: 0, channel: "url", field: "final url", base: "/about", preview: "/help", classification: "unclaimed", reason: "r" },
+      { stepIndex: 0, channel: "tree", field: 'heading "About"', base: "About", preview: "—", classification: "unclaimed", reason: "r" },
+      { stepIndex: 0, channel: "tree", field: 'text "Body"', base: "Body", preview: "—", classification: "unclaimed", reason: "r" },
+      { stepIndex: 1, channel: "tree", field: 'text "More"', base: "More", preview: "—", classification: "unclaimed", reason: "r" },
+    ]);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.severity).toBe("critical");
+    expect(findings[0]!.signature).toContain("url");
+  });
+
+  it("still reports content changes when the journey stayed on the page", () => {
+    const findings = findingsFrom([
+      { stepIndex: 0, channel: "tree", field: 'text "Subtotal"', base: "$132.00", preview: "$NaN", classification: "unclaimed", reason: "r" },
+      { stepIndex: 1, channel: "console", field: "error: nan", base: "silent", preview: "NaN", classification: "unclaimed", reason: "r" },
+    ]);
+    expect(findings).toHaveLength(2);
+  });
+
   it("raises nothing for claimed, noise or matching deltas", () => {
     expect(
       findingsFrom([

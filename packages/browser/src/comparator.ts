@@ -224,7 +224,10 @@ function treeDeltas(
         };
       }
 
-      return classify("tree", field, from || "—", to || "—", claims, stepIndex, route);
+      // Node ids are stripped from the reported values as well as the field.
+      // They carry no meaning for a reader and they are the first thing in a
+      // finding summary, where they read as line noise.
+      return classify("tree", field, readable(from), readable(to), claims, stepIndex, route);
   });
 
   // Cap signal and churn separately. Slicing the combined list meant a page
@@ -233,6 +236,12 @@ function treeDeltas(
   const signal = classified.filter((d) => d.classification !== "noise");
   const noise = classified.filter((d) => d.classification === "noise");
   return [...signal.slice(0, max), ...noise.slice(0, MAX_NOISE_SAMPLES)];
+}
+
+/** A tree line with its per-session node id removed. */
+function readable(line: string): string {
+  const bare = line.replace(/\[\d+-\d+\]/g, "").trim();
+  return bare.length > 0 ? bare : "—";
 }
 
 /**
@@ -372,8 +381,26 @@ function severityFor(delta: SnapshotDelta): RawFinding["severity"] {
 export function findingsFrom(deltas: readonly SnapshotDelta[]): RawFinding[] {
   const bySignature = new Map<string, SnapshotDelta[]>();
 
+  /**
+   * Once the journey has landed on a different page, everything on that page
+   * differs — and none of it is an independent regression. The navigation is
+   * the root behaviour and the rest is its consequence, so content deltas at
+   * or after a divergence stay as evidence but do not each become a finding.
+   *
+   * Without this, two pages that simply differ produce a finding per element:
+   * a real run against genuinely different deployments raised thirteen where
+   * the honest answer is one.
+   */
+  const divergedAt = deltas
+    .filter((d) => d.channel === "url" && d.classification === "unclaimed")
+    .reduce<number | null>((min, d) => (min === null ? d.stepIndex : Math.min(min, d.stepIndex)), null);
+
+  const downstream = (d: SnapshotDelta) =>
+    divergedAt !== null && d.channel !== "url" && d.stepIndex >= divergedAt;
+
   for (const d of deltas) {
     if (d.classification !== "unclaimed") continue;
+    if (downstream(d)) continue;
     const signature = `differential::${d.channel}::${normalise(d.field)}`;
     bySignature.set(signature, [...(bySignature.get(signature) ?? []), d]);
   }
