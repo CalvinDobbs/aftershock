@@ -151,8 +151,12 @@ export function BotAvatar({
       <circle cx="20" cy="20" r="20" fill={b.fill} />
       {animate ? (
         <>
-          <g style={{ animation: `idle ${b.dur} ease-in-out infinite` }}>{face.idle}</g>
-          <g style={{ animation: `grin ${b.dur} ease-in-out infinite` }}>{face.grin}</g>
+          {/* Base opacities matter: a running animation outranks an inline
+              declaration, but when prefers-reduced-motion collapses the
+              animation both groups fall back to these values. Without them
+              the grin renders on top of the resting face. */}
+          <g style={{ opacity: 1, animation: `idle ${b.dur} ease-in-out infinite` }}>{face.idle}</g>
+          <g style={{ opacity: 0, animation: `grin ${b.dur} ease-in-out infinite` }}>{face.grin}</g>
         </>
       ) : (
         <g>{face.idle}</g>
@@ -190,8 +194,8 @@ export function RunMark({ size = 26, animate = true }: { size?: number; animate?
       <circle cx="20" cy="20" r="20" fill="#e8a33d" />
       {animate ? (
         <>
-          <g style={{ animation: 'idle 6.8s ease-in-out infinite' }}>{idle}</g>
-          <g style={{ animation: 'grin 6.8s ease-in-out infinite' }}>{grin}</g>
+          <g style={{ opacity: 1, animation: 'idle 6.8s ease-in-out infinite' }}>{idle}</g>
+          <g style={{ opacity: 0, animation: 'grin 6.8s ease-in-out infinite' }}>{grin}</g>
         </>
       ) : (
         <g>{idle}</g>

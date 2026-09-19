@@ -28,6 +28,9 @@ export function Composer({ runId }: { runId: string }) {
 
   return (
     <div className="pt-0.5 pb-[22px]">
+      {/* PLACEHOLDER — the attach and dictate affordances are decorative. The
+          text field is wired: it POSTs to /runs/:id/ask, which forwards to the
+          Director. Drop both icons if they are still inert at the freeze. */}
       <div className="flex items-center gap-3 rounded-full bg-composer px-[18px] py-[13px]">
         <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden>
           <path d="M8 3v10M3 8h10" stroke="#8a8a8a" strokeWidth="1.6" strokeLinecap="round" />

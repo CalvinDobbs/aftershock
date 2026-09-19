@@ -19,7 +19,14 @@ export function lastBot(r: RunSummary): BotId | 'run' {
   return r.prNumber ? 'encore' : 'gavel';
 }
 
-/** One-line preview under a run in the sidebar. */
+/**
+ * One-line preview under a run in the sidebar.
+ *
+ * PLACEHOLDER — "Encore verified it" is asserted from the presence of a PR.
+ * RunSummary has no verification flag, so a PR opened as a draft marked
+ * `aftershock:unverified` reads here as verified, which is the one claim this
+ * product must never get wrong. Add `verified: boolean` to RunSummary.
+ */
 export function preview(r: RunSummary): string {
   if (r.status === 'pending') return 'waiting for the preview deployment';
   if (r.status === 'running') return 'Diffany is reading the diff…';

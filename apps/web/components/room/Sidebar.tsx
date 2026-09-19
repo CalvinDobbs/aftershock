@@ -40,6 +40,8 @@ export function Sidebar({
       </div>
 
       <div className="px-3 pt-1 pb-2.5">
+        {/* PLACEHOLDER — inert. Search across runs needs a query endpoint on
+            `api`; there is nothing to filter client-side once runs paginate. */}
         <div className="flex items-center gap-[9px] rounded-[11px] bg-card-2 px-3 py-[9px]">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
             <circle cx="7" cy="7" r="4.6" stroke="#9e9e9e" strokeWidth="1.4" />
@@ -158,6 +160,9 @@ export function Sidebar({
         </div>
       </div>
 
+      {/* PLACEHOLDER — the signed-in user is hardcoded. The PRD puts auth on
+          our own dashboard explicitly out of scope, so this stays until there
+          is a session to read; swap for the GitHub App's installation user. */}
       <div className="flex items-center gap-[11px] border-t border-edge px-[18px] py-3.5">
         <span className="flex size-8 items-center justify-center rounded-full bg-[#262626] text-[12px]/[1] font-medium text-ink-4">
           MK

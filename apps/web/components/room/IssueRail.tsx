@@ -153,6 +153,9 @@ export function IssueRail({
         <div className="flex gap-2">
           <Thumb step={pair.before} caption="before" />
           <Thumb step={pair.after} caption="after" bad />
+          {/* PLACEHOLDER — not a real player. The MP4 export of a confirmed
+              finding is what gets attached to the GitHub issue; link this to
+              that object-storage URL once Curtain Call uploads it. */}
           <div className="flex-1">
             <div className="flex h-[47px] items-center justify-center rounded-[6px] bg-shot">
               <span
@@ -253,6 +256,9 @@ export function IssueRail({
         <div className="flex gap-2">
           <Thumb step={pair.after} caption={verification ? 'before the fix' : 'today, broken'} bad />
           {verification ? (
+            /* PLACEHOLDER — shows the verified value rather than the frame.
+               Encore captures an "after" screenshot; render it here once
+               VerificationRow.afterScreenshotUrl is populated. */
             <div className="flex-1">
               <div className="flex h-[47px] items-center justify-center rounded-[6px] bg-white">
                 <span className="mono text-[11px] font-medium text-[#1a7f4b]">

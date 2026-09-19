@@ -88,6 +88,8 @@ export function Room({
               assignments={state.assignments}
               host={host}
               baseHost={baseHost}
+              branch={run.commit.branch}
+              baseBranch={run.baseBranch ?? 'base'}
               maxConcurrent={maxConcurrent}
             />
           ) : (

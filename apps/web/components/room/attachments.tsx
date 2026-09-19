@@ -71,10 +71,34 @@ function AssertionRows({ rows }: { rows: { id: string; statement: string; source
 
 // --- QAizen's recording -----------------------------------------------------
 
+/**
+ * The value the assertion expected, for the caption under the failing frame.
+ *
+ * PLACEHOLDER — parsed out of the step label the agent wrote. The Cast knows
+ * this value exactly at the moment it asserts, so the right home for it is a
+ * structured field on the failing Step (`expected`, alongside `digest`). Until
+ * the runner emits one, this reads whatever the agent put in the label and
+ * shows nothing if it cannot find it. Never invent a value here.
+ */
+function expectedLabel(step?: Step): string | undefined {
+  const m = step?.label.match(/expected\s+([^)]+?)\)?\s*$/i);
+  return m?.[1] ? `expected ${m[1].trim()}` : undefined;
+}
+
 function RecordingCard({ assignment: a, host }: { assignment: Assignment; host: string }) {
   const [open, setOpen] = useState(false);
   const { before, after } = evidencePair(a);
   const url = `${host}${a.route}`;
+
+  // Flag the frame by its own outcome, not the assignment's. When the failing
+  // step has no capture, `evidencePair` falls back to a step that did pass,
+  // and painting that one red would misattribute the failure.
+  const flagged = after?.ok === false;
+
+  // The playhead marks the middle of the slot belonging to the frame shown
+  // beside it, so the scrubber and the screenshot always agree. Step indices
+  // are 1-based, hence the half-step offset.
+  const playhead = after && a.steps.length > 0 ? (after.idx - 0.5) / a.steps.length : 0;
 
   return (
     <div className="flex flex-col gap-[11px] rounded-[14px] bg-card-2 p-[13px]">
@@ -92,13 +116,13 @@ function RecordingCard({ assignment: a, host }: { assignment: Assignment; host: 
         <Shot
           step={after}
           url={url}
-          caption={`step ${after?.idx ?? '—'} — ${after?.ok ? 'after' : 'unchanged'}`}
-          note={after?.ok ? undefined : 'expected $67.20'}
-          bad={!after?.ok}
+          caption={`step ${after?.idx ?? '—'} — ${flagged ? 'unchanged' : 'after'}`}
+          note={flagged ? expectedLabel(after) : undefined}
+          bad={flagged}
         />
       </div>
 
-      <Scrubber duration={duration(a.durationMs)} steps={a.steps.length} />
+      <Scrubber duration={duration(a.durationMs)} steps={a.steps.length} position={playhead} />
 
       <div className="flex px-[3px]">
         <button
@@ -208,6 +232,9 @@ function LiveCard({ assignment: a, host }: { assignment: Assignment; host: strin
         <StatePill state="working" />
       </div>
 
+      {/* PLACEHOLDER — the cursor mark is parked at a fixed spot. The real
+          position is the bounding box of the element the pending Action
+          targets; surface it on the Action and pass it through here. */}
       <BrowserFrame url={`${host}${a.route}`} live rec={rec} cursor={{ left: '62%', top: '58%' }}>
         <PageShot digest={last?.digest} screenshotUrl={last?.screenshotUrl} scale="lg" />
       </BrowserFrame>

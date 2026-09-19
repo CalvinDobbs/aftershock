@@ -20,11 +20,15 @@ export function BrowsersGrid({
   assignments,
   host,
   baseHost,
+  branch,
+  baseBranch,
   maxConcurrent,
 }: {
   assignments: Assignment[];
   host: string;
   baseHost: string;
+  branch: string;
+  baseBranch: string;
   maxConcurrent: number;
 }) {
   const sessions = assignments.reduce((n, a) => n + (a.archetype === 'differential' ? 2 : 1), 0);
@@ -42,7 +46,7 @@ export function BrowsersGrid({
       <div className="mt-[22px] grid grid-cols-3 gap-[22px]">
         {assignments.map((a) =>
           a.archetype === 'differential' ? (
-            <DiffCard key={a.id} a={a} host={host} baseHost={baseHost} />
+            <DiffCard key={a.id} a={a} host={host} baseHost={baseHost} branch={branch} baseBranch={baseBranch} />
           ) : (
             <SoloCard key={a.id} a={a} host={host} />
           ),
@@ -159,17 +163,29 @@ function Strip({ steps, hot }: { steps: number; hot: boolean }) {
   );
 }
 
-function DiffCard({ a, host, baseHost }: { a: Assignment; host: string; baseHost: string }) {
+function DiffCard({
+  a,
+  host,
+  baseHost,
+  branch,
+  baseBranch,
+}: {
+  a: Assignment;
+  host: string;
+  baseHost: string;
+  branch: string;
+  baseBranch: string;
+}) {
   const step = [...a.steps].reverse().find((s) => s.baseDigest || s.digest) ?? a.steps.at(-1);
 
   return (
     <div className="col-span-2 rounded-[14px] bg-card p-[13px]">
       <CardHead a={a} />
       <div className="flex gap-3">
-        <Side label="MAIN" host={baseHost}>
+        <Side label={baseBranch.toUpperCase()} host={baseHost}>
           <PageShot digest={step?.baseDigest} screenshotUrl={step?.baseScreenshotUrl} scale="md" />
         </Side>
-        <Side label={a.id === 'D1' ? 'BRANCH' : 'BRANCH'} host={host} flagged>
+        <Side label={branch.toUpperCase()} host={host} flagged>
           <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="md" />
         </Side>
       </div>

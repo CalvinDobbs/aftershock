@@ -137,6 +137,26 @@ replay** on any recording card.
 
 ---
 
+## Placeholders
+
+Everything still standing in for real data is marked. Before the freeze:
+
+```bash
+grep -rn "PLACEHOLDER" apps/web --include='*.ts' --include='*.tsx'
+```
+
+Each marker says what the real source is and, where it matters, which schema
+field is missing. The two worth fixing first:
+
+- **`lib/derive.ts`** — the sidebar infers "Encore verified it" from a PR
+  existing. A draft PR marked `aftershock:unverified` would read as verified,
+  which is the one claim this product cannot get wrong. Needs
+  `RunSummary.verified`.
+- **`fixtures/golden-run.ts`** — delete the fixture path once `api` serves
+  real runs, but move the golden run into the database rather than losing it.
+  It is the DEMO_MODE replay source, and a dead network on stage should cost
+  nothing.
+
 ## Notes for the backend
 
 - **`Step.digest`** is the PRD's typed visible-text digest — the thing the

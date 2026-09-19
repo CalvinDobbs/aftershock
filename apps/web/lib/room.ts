@@ -210,7 +210,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
         ? [
             {
               kind: 'diffpair',
-              baseLabel: 'MAIN',
+              baseLabel: (run.baseBranch ?? 'base').toUpperCase(),
               headLabel: run.commit.branch.toUpperCase(),
               rows: (finding?.deltas ?? [])
                 .filter((d) => d.classification === 'unclaimed' || d.classification === 'claimed')

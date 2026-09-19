@@ -13,7 +13,12 @@ import type {
 } from '@aftershock/schema';
 
 /**
- * The cached golden run (PRD > Demo safety).
+ * PLACEHOLDER — the cached golden run (PRD > Demo safety).
+ *
+ * This whole file goes away once `api` serves real runs. Keep the golden run
+ * itself: it belongs in the database as the DEMO_MODE replay source so a dead
+ * network on stage costs nothing. Until then it is the contract by example —
+ * if the backend produces this shape, the room renders.
  *
  * This is the replay source the dashboard falls back to when NEXT_PUBLIC_API_URL
  * is unset, and the thing DEMO_MODE replays if the network dies on stage. It is
@@ -46,6 +51,7 @@ export const run: Run = {
   },
   previewUrl: 'https://meridian-git-feat-coupon-codes.vercel.app',
   baseUrl: 'https://meridian.vercel.app',
+  baseBranch: 'main',
   status: 'complete',
   riskScore: 0.72,
   startedAt: at(0),

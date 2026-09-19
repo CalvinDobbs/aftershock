@@ -40,6 +40,12 @@ export const Run = z.object({
   previewUrl: z.string().nullable(),
   /** Null when base URL resolution failed; differential assignments are then skipped. */
   baseUrl: z.string().nullable(),
+  /**
+   * The branch `baseUrl` was resolved from — the PR's base, or the repo
+   * default for a bare push. Labels the left pane of every differential pair,
+   * so it must be what was actually compared against, not an assumption.
+   */
+  baseBranch: z.string().nullable(),
   status: RunStatus,
   riskScore: Confidence,
   startedAt: z.string(),

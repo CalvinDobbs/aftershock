@@ -36,8 +36,10 @@ export async function getRunDetail(runId: string): Promise<RunDetail | null> {
     const live = await get<RunDetail>(`/runs/${runId}`);
     if (live) return live;
   }
-  // Every fixture row deep-links to the golden run so the dashboard is
-  // navigable before the backend exists.
+  // PLACEHOLDER — every fixture row resolves to the same golden run so the
+  // dashboard is navigable before the backend exists. Delete this branch once
+  // `api` serves real runs; the golden run itself should then live in the
+  // database as the DEMO_MODE replay source, not in the bundle.
   if (golden.runList.some((r) => r.id === runId)) {
     return { ...golden.detail, run: { ...golden.detail.run, id: runId } };
   }
