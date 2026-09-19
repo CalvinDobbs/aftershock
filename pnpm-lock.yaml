@@ -21,6 +21,15 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.18.6)(tsx@4.20.5)
 
+  apps/orchestrator:
+    dependencies:
+      '@aftershock/browser':
+        specifier: workspace:*
+        version: link:../../packages/browser
+      '@aftershock/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+
   packages/browser:
     dependencies:
       '@aftershock/schema':

@@ -152,8 +152,14 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+export const AgentTraceEventSchema = z.object({
+  sequence: z.number().int().nonnegative(),
+  event: AgentEventSchema,
+});
+
 export type Action = z.infer<typeof ActionSchema>;
 export type AgentEvent = z.infer<typeof AgentEventSchema>;
+export type AgentTraceEvent = z.infer<typeof AgentTraceEventSchema>;
 export type Assignment = z.infer<typeof AssignmentSchema>;
 export type AssignmentResult = z.infer<typeof AssignmentResultSchema>;
 export type AssignmentStepResult = z.infer<typeof AssignmentStepResultSchema>;
