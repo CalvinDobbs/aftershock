@@ -193,6 +193,66 @@ field is missing. The two worth fixing first:
   It is the DEMO_MODE replay source, and a dead network on stage should cost
   nothing.
 
+## Differential execution
+
+The second oracle, and the only part of the pipeline that produces findings
+today. It needs no charter, no GitHub and no LLM: the base branch defines
+correct, so a difference nothing claimed is a regression by construction.
+
+```bash
+# a deployment against itself — must find nothing
+curl -X POST localhost:3001/api/demo/canary
+```
+
+```
+packages/browser/src/normalise.ts    noise rules, written before the comparator
+packages/browser/src/comparator.ts   snapshot diff + four-way classification
+packages/browser/src/differential.ts paired sessions, plan once, replay both
+```
+
+**Planning happens exactly once.** If each side asked a model what to click,
+any difference could be model variance rather than a regression. The preview
+side plans; the base side replays the Actions it produced. A journey that
+already carries its Actions — a re-run, or verification against a fix —
+replays on both sides concurrently instead.
+
+**Every delta is classified and every classification is explained:**
+
+| | |
+| --- | --- |
+| `match` | identical, or equal after normalisation. Not emitted. |
+| `noise` | timestamps, uuids, node ids, cache-busters. Counted, never reported. |
+| `claimed` | the diff said this would change. Expected. |
+| `unclaimed` | nothing predicted it. **This is a regression.** |
+
+Classification is deliberately asymmetric: a false `claimed` hides a real
+regression forever, a false `unclaimed` only reaches the Critic, which has
+three more gates to kill it. So `claimed` needs strong evidence and anything
+ambiguous stays `unclaimed`.
+
+### The noise canary
+
+`POST /api/demo/canary` runs one journey against the **same URL twice**. A page
+differs from itself on every load, so a healthy run reports **zero** findings.
+If it reports any, the normalisation rules have a hole and every differential
+finding in the product is suspect.
+
+It is not decoration. Its first live run found twelve findings against a static
+page: Stagehand numbers accessibility-tree nodes per session (`[0-17]` on one
+side, `[0-62]` on the other), so two captures of an identical page disagreed on
+every line. That rule now exists and is regression-tested.
+
+Keep the canary target static — `AFTERSHOCK_CANARY_URL` defaults to
+`example.com`. Point it at a site whose content changes between loads and you
+are measuring the internet, not the filter.
+
+### What it does not do yet
+
+Sessions run in sequence on a first pass, because the Actions have to exist
+before they can be replayed. Step-level lockstep — observe on preview, act on
+both, compare, repeat — needs `runAssignment` restructured into a step driver.
+Same browser-hours either way; twice the wall clock on a first run.
+
 ## Notes for the backend
 
 - **`Step.digest`** is the PRD's typed visible-text digest — the thing the

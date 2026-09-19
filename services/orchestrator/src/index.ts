@@ -36,6 +36,10 @@ export {
   type ObservableAssignmentOptions,
 } from "./assignment-runner.js";
 export {
+  runObservableDifferential,
+  type ObservableDifferentialOptions,
+} from "./differential-runner.js";
+export {
   createObservabilityRuntime,
   type ObservabilityRuntime,
   type ObservabilityRuntimeOptions,

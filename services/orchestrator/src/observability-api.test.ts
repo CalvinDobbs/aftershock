@@ -54,6 +54,7 @@ const screenshotRepository: ScreenshotRepository = {
 };
 
 let demoRunResult: { runId: string; assignmentId: string } | undefined;
+let canaryRunResult: { runId: string; assignmentId: string } | undefined;
 let server: Server;
 let noLauncherServer: Server;
 let base: string;
@@ -66,6 +67,7 @@ beforeAll(async () => {
     replayService,
     screenshotRepository,
     demoRunLauncher: () => demoRunResult,
+    noiseCanaryLauncher: () => canaryRunResult,
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -176,6 +178,24 @@ describe("observability api", () => {
     const conflict = await fetch(`${base}/api/demo/runs`, { method: "POST" });
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toEqual({ error: "A demo run is already active" });
+  });
+
+  it("launches the noise canary with 202 and rejects a concurrent one with 409", async () => {
+    canaryRunResult = { runId: "canary-1", assignmentId: "noise-canary" };
+    const created = await fetch(`${base}/api/demo/canary`, { method: "POST" });
+    expect(created.status).toBe(202);
+    expect(await created.json()).toEqual({ run: canaryRunResult });
+
+    canaryRunResult = undefined;
+    const conflict = await fetch(`${base}/api/demo/canary`, { method: "POST" });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({ error: "A canary run is already active" });
+  });
+
+  it("returns 404 for the canary when no launcher is configured", async () => {
+    const response = await fetch(`${noLauncherBase}/api/demo/canary`, { method: "POST" });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not found" });
   });
 
   it("returns 404 for demo runs when no launcher is configured", async () => {

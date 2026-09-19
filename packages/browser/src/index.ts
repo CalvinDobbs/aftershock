@@ -1,6 +1,7 @@
 export { loadBrowserConfig, type BrowserConfig } from "./config.js";
 export { collectSessionEvidence } from "./evidence.js";
 export {
+  AssignmentFailedError,
   runAssignment,
   type RunAssignmentOptions,
   type ScreenshotCapture,
@@ -15,3 +16,27 @@ export {
   type SessionReplay,
   type SessionReplayService,
 } from "./replay.js";
+export {
+  claimCovering,
+  compareResults,
+  compareSnapshots,
+  findingsFrom,
+  type ComparisonOutcome,
+  type CompareOptions,
+} from "./comparator.js";
+export {
+  isReplayable,
+  runDifferential,
+  withRecordedActions,
+  type RunDifferentialOptions,
+} from "./differential.js";
+export {
+  NOISE_RULES,
+  normalise,
+  normaliseTreeLine,
+  normaliseUrl,
+  pathAndQuery,
+  rulesFired,
+  volatileReason,
+  type NoiseRule,
+} from "./normalise.js";

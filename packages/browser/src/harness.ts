@@ -4,12 +4,34 @@ import {
   type Action,
   type AgentEvent,
   type Assignment,
+  type AssignmentResult,
   type AssignmentStepResult,
 } from "@aftershock/schema/browser";
 
 import { loadBrowserConfig, type BrowserConfig } from "./config.js";
 import { collectSessionEvidence } from "./evidence.js";
 import { launchBrowserSession, type BrowserSession, type BrowserSessionFactory } from "./session.js";
+
+/**
+ * Thrown when an assignment dies part-way, carrying what it managed to
+ * collect.
+ *
+ * A journey that breaks half-way is not an absence of evidence — it is the
+ * evidence. The differential comparator has to see the steps that did run to
+ * report that the same Actions no longer complete on both sides, which is the
+ * signature of the worst class of regression. Callers that only want the
+ * happy path can keep treating this as an ordinary throw.
+ */
+export class AssignmentFailedError extends Error {
+  constructor(
+    message: string,
+    readonly result: AssignmentResult,
+    readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "AssignmentFailedError";
+  }
+}
 
 export interface ScreenshotCapture {
   runId: string;
@@ -78,6 +100,8 @@ export async function runAssignment(options: RunAssignmentOptions) {
   const startedAtMs = now();
   const startedAt = new Date(startedAtMs).toISOString();
   let session: BrowserSession | undefined;
+  // Declared outside the try so a failure can still hand back what ran.
+  const steps: AssignmentStepResult[] = [];
 
   try {
     session = await sessionFactory(config);
@@ -92,8 +116,6 @@ export async function runAssignment(options: RunAssignmentOptions) {
     await session.page.goto(new URL(assignment.route, targetUrl).toString(), {
       waitUntil: "domcontentloaded",
     });
-
-    const steps: AssignmentStepResult[] = [];
 
     for (const [index, journeyStep] of assignment.journey.entries()) {
       let action: Action;
@@ -184,13 +206,26 @@ export async function runAssignment(options: RunAssignmentOptions) {
       finishedAt: new Date(now()).toISOString(),
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     await emit({
       ...eventBase(assignment, now),
       type: "session.failed",
       ...(session ? { sessionId: session.sessionId } : {}),
-      message: error instanceof Error ? error.message : String(error),
+      message,
     });
-    throw error;
+
+    throw new AssignmentFailedError(
+      message,
+      AssignmentResultSchema.parse({
+        assignmentId: assignment.id,
+        sessionId: session?.sessionId ?? "",
+        steps,
+        findings: [],
+        startedAt,
+        finishedAt: new Date(now()).toISOString(),
+      }),
+      error,
+    );
   } finally {
     if (session) await closeSession(session, assignment, emit, now, startedAtMs);
   }

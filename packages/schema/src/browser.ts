@@ -90,6 +90,70 @@ export const AssignmentResultSchema = z.object({
   finishedAt: z.string().datetime(),
 });
 
+/**
+ * Differential execution.
+ *
+ * Two sessions run the *same* recorded Actions — one against the preview
+ * deployment, one against the base — and every observable is compared after
+ * each step. A difference falls into exactly one of four buckets, and which
+ * bucket decides whether it is a regression:
+ *
+ *   match     identical, or within tolerance. Ignored.
+ *   claimed   differs, and the diff said it would. Expected; shown as green.
+ *   noise     timestamps, nonces, ids, ordering. Normalised away before
+ *             comparison, never reported.
+ *   unclaimed differs, and nothing in the diff predicted it. This is a
+ *             regression, by construction.
+ *
+ * The base branch is the oracle, so no statement of intent is required for
+ * this to work — which is what makes it the stronger of the two oracles.
+ */
+
+export const DeltaClassificationSchema = z.enum(["match", "claimed", "noise", "unclaimed"]);
+
+/** Which observable differed. Kept coarse so findings cluster sensibly. */
+export const DeltaChannelSchema = z.enum([
+  "url",
+  "tree",
+  "text",
+  "network",
+  "console",
+  "status",
+]);
+
+export const SnapshotDeltaSchema = z.object({
+  stepIndex: z.number().int().nonnegative(),
+  channel: DeltaChannelSchema,
+  /** What differed, in terms a person can read: a node path, a URL, a key. */
+  field: z.string(),
+  base: z.string(),
+  preview: z.string(),
+  classification: DeltaClassificationSchema,
+  /**
+   * Why it was classified that way. Every classification is auditable — a
+   * comparator that cannot explain itself cannot be trusted or tuned.
+   */
+  reason: z.string(),
+});
+
+export const DifferentialResultSchema = z.object({
+  assignmentId: z.string(),
+  previewSessionId: z.string(),
+  baseSessionId: z.string(),
+  /** Every delta, including the ones that were dismissed. */
+  deltas: z.array(SnapshotDeltaSchema),
+  /** How many raw differences were dropped as noise, for the run summary. */
+  noiseFiltered: z.number().int().nonnegative(),
+  findings: z.array(RawFindingSchema),
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime(),
+});
+
+export type DeltaChannel = z.infer<typeof DeltaChannelSchema>;
+export type DeltaClassification = z.infer<typeof DeltaClassificationSchema>;
+export type DifferentialResult = z.infer<typeof DifferentialResultSchema>;
+export type SnapshotDelta = z.infer<typeof SnapshotDeltaSchema>;
+
 const EventEnvelopeSchema = z.object({
   runId: z.string(),
   assignmentId: z.string(),
@@ -136,6 +200,12 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     screenshotId: z.string().optional(),
     network: NetworkSummarySchema,
     consoleErrors: z.array(ConsoleEntrySchema),
+  }),
+  EventEnvelopeSchema.extend({
+    type: z.literal("step.compared"),
+    index: z.number().int().nonnegative(),
+    deltas: z.array(SnapshotDeltaSchema),
+    noiseFiltered: z.number().int().nonnegative(),
   }),
   EventEnvelopeSchema.extend({
     type: z.literal("finding.raised"),

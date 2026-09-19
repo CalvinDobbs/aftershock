@@ -21,6 +21,7 @@ const EVENT_TYPES: AgentEvent['type'][] = [
   'step.planned',
   'step.executed',
   'step.captured',
+  'step.compared',
   'finding.raised',
   'session.closed',
   'session.failed',

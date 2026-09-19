@@ -18,6 +18,8 @@ export interface ObservabilityApiOptions {
   replayService: SessionReplayService;
   screenshotRepository: ScreenshotRepository;
   demoRunLauncher?: DemoRunLauncher;
+  /** Runs a deployment against itself; healthy means it finds nothing. */
+  noiseCanaryLauncher?: DemoRunLauncher;
 }
 
 function sendJson(res: Parameters<RequestListener>[1], status: number, body: unknown): void {
@@ -38,7 +40,8 @@ function writeTrace(res: Parameters<RequestListener>[1], trace: AgentTraceEvent)
 }
 
 export function createObservabilityHandler(options: ObservabilityApiOptions): RequestListener {
-  const { eventStream, replayService, screenshotRepository, demoRunLauncher } = options;
+  const { eventStream, replayService, screenshotRepository, demoRunLauncher, noiseCanaryLauncher } =
+    options;
 
   return async (req, res) => {
     try {
@@ -64,6 +67,26 @@ export function createObservabilityHandler(options: ObservabilityApiOptions): Re
         const run = await demoRunLauncher();
         if (!run) {
           sendJson(res, 409, { error: "A demo run is already active" });
+          return;
+        }
+        sendJson(res, 202, { run });
+        return;
+      }
+
+      if (
+        req.method === "POST" &&
+        segments.length === 3 &&
+        segments[0] === "api" &&
+        segments[1] === "demo" &&
+        segments[2] === "canary"
+      ) {
+        if (!noiseCanaryLauncher) {
+          sendJson(res, 404, { error: "Not found" });
+          return;
+        }
+        const run = await noiseCanaryLauncher();
+        if (!run) {
+          sendJson(res, 409, { error: "A canary run is already active" });
           return;
         }
         sendJson(res, 202, { run });
