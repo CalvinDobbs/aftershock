@@ -28,6 +28,8 @@ export interface CreateRunInput {
   prNumber?: number;
   /** Absent on a push: the deployment does not exist yet. */
   previewUrl?: string;
+  /** Who pushed, as GitHub reports it. The sidebar shows this before Scout has read anything. */
+  author?: string;
 }
 
 export interface WebhookDeps {
@@ -58,11 +60,22 @@ export function verifySignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-type PushEvent = { ref?: string; after?: string; repository?: { full_name?: string; default_branch?: string } };
+type PushEvent = {
+  ref?: string;
+  after?: string;
+  repository?: { full_name?: string; default_branch?: string };
+  pusher?: { name?: string };
+  head_commit?: { author?: { name?: string; username?: string } };
+};
 type PullRequestEvent = {
   action?: string;
   number?: number;
-  pull_request?: { head?: { sha?: string; ref?: string }; base?: { ref?: string }; draft?: boolean };
+  pull_request?: {
+    head?: { sha?: string; ref?: string };
+    base?: { ref?: string };
+    draft?: boolean;
+    user?: { login?: string };
+  };
   repository?: { full_name?: string };
 };
 type DeploymentStatusEvent = {
@@ -97,7 +110,16 @@ export async function handleWebhook(
       return { action: "ignored", reason: `${ref} is the baseline, not a change to test` };
     }
 
-    const { runId } = await deps.createRun({ repo, sha, ref, baseRef: defaultBranch });
+    // The commit's author over the pusher: a rebase-and-push by a teammate
+    // should still credit whoever wrote the change.
+    const author = p.head_commit?.author?.name ?? p.head_commit?.author?.username ?? p.pusher?.name;
+    const { runId } = await deps.createRun({
+      repo,
+      sha,
+      ref,
+      baseRef: defaultBranch,
+      ...(author ? { author } : {}),
+    });
     return { action: "created", runId, status: "pending" };
   }
 
@@ -118,6 +140,7 @@ export async function handleWebhook(
       ref: p.pull_request?.head?.ref ?? "",
       baseRef: p.pull_request?.base?.ref ?? "main",
       ...(p.number !== undefined ? { prNumber: p.number } : {}),
+      ...(p.pull_request?.user?.login ? { author: p.pull_request.user.login } : {}),
     });
     return { action: "created", runId, status: "pending" };
   }

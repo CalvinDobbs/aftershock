@@ -109,6 +109,12 @@ export function createServer(options: ServerOptions = {}): FastifyInstance {
         ...(Object.keys(project.routeSetup).length > 0 ? { routeSetup: project.routeSetup } : {}),
         ...(project.criticalJourney ? { criticalJourney: project.criticalJourney } : {}),
         ...(project.maxConcurrent !== undefined ? { maxConcurrent: project.maxConcurrent } : {}),
+        // The Director learns the message from the diff; the author and branch
+        // only the webhook knows, so they ride along here.
+        commitMetadata: {
+          branch: run.ref.replace(/^refs\/heads\//, ""),
+          ...(run.author ? { author: run.author } : {}),
+        },
       }),
     }).catch(() => null);
 
@@ -157,7 +163,7 @@ export function createServer(options: ServerOptions = {}): FastifyInstance {
         commit: {
           sha: run.sha,
           message: "",
-          author: "",
+          author: run.author ?? "",
           branch: run.ref.replace(/^refs\/heads\//, ""),
           ...(run.prNumber !== undefined ? { prNumber: run.prNumber } : {}),
           filesChanged: 0,

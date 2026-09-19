@@ -162,6 +162,15 @@ export function createObservabilityRuntime(
           }
         : {}),
       ...(request.maxConcurrent !== undefined ? { maxConcurrent: request.maxConcurrent } : {}),
+      // Rebuilt for the same exactOptionalPropertyTypes reason as criticalJourney.
+      ...(request.commitMetadata
+        ? {
+            commitMetadata: {
+              ...(request.commitMetadata.author ? { author: request.commitMetadata.author } : {}),
+              ...(request.commitMetadata.branch ? { branch: request.commitMetadata.branch } : {}),
+            },
+          }
+        : {}),
       eventStream,
       screenshotRepository,
       ...(options.repairServices ? { repairServices: options.repairServices } : {}),

@@ -45,6 +45,14 @@ export const CommitRunRequestSchema = z.object({
     })
     .optional(),
   maxConcurrent: z.number().int().positive().optional(),
+  /**
+   * What the trigger already knows about the commit. Scout reads the diff and
+   * the message itself, but the author and branch arrive with the webhook and
+   * are otherwise "unknown" in the dashboard's sidebar until a run ends.
+   */
+  commitMetadata: z
+    .object({ author: z.string().min(1).optional(), branch: z.string().min(1).optional() })
+    .optional(),
 });
 export type CommitRunRequest = z.infer<typeof CommitRunRequestSchema>;
 

@@ -57,6 +57,26 @@ describe("push", () => {
     );
   });
 
+  it("credits the commit's author, falling back to the pusher", async () => {
+    // GitHub sends both. The author wrote the change; the pusher may just have
+    // rebased it. The sidebar shows this name before Scout has read anything.
+    const d = deps();
+    await handleWebhook(
+      "push",
+      push({ pusher: { name: "calvin" }, head_commit: { author: { name: "Nikhil Doal" } } }),
+      d,
+    );
+    expect(d.createRun).toHaveBeenCalledWith(expect.objectContaining({ author: "Nikhil Doal" }));
+
+    const onlyPusher = deps();
+    await handleWebhook("push", push({ pusher: { name: "calvin" } }), onlyPusher);
+    expect(onlyPusher.createRun).toHaveBeenCalledWith(expect.objectContaining({ author: "calvin" }));
+
+    const nobody = deps();
+    await handleWebhook("push", push(), nobody);
+    expect(nobody.createRun).toHaveBeenCalledWith(expect.not.objectContaining({ author: expect.anything() }));
+  });
+
   it("ignores the default branch, which is the baseline", async () => {
     const out = await handleWebhook("push", push({ ref: "refs/heads/main" }), deps());
     expect(out).toMatchObject({ action: "ignored" });
@@ -75,15 +95,21 @@ describe("pull_request", () => {
   const pr = (action: string) => ({
     action,
     number: 2,
-    pull_request: { head: { sha: "a3f9c21", ref: "feat/coupon-codes" }, base: { ref: "main" } },
+    pull_request: {
+      head: { sha: "a3f9c21", ref: "feat/coupon-codes" },
+      base: { ref: "main" },
+      user: { login: "nikhil" },
+    },
     repository: { full_name: "o/r" },
   });
 
-  it("creates a run and carries the PR number, which buys a better charter", async () => {
+  it("creates a run and carries the PR number and author, which buys a better charter", async () => {
     const d = deps();
     const out = await handleWebhook("pull_request", pr("opened"), d);
     expect(out).toMatchObject({ action: "created" });
-    expect(d.createRun).toHaveBeenCalledWith(expect.objectContaining({ prNumber: 2, baseRef: "main" }));
+    expect(d.createRun).toHaveBeenCalledWith(
+      expect.objectContaining({ prNumber: 2, baseRef: "main", author: "nikhil" }),
+    );
   });
 
   it("ignores actions that are not a code change", async () => {

@@ -67,7 +67,7 @@ export interface CommitRunOptions {
   sourceSnapshot?: (repo: string, ref: string) => Promise<SourceSnapshot>;
   /** Shauraya's API/persistence consumes these product events, separate from browser telemetry. */
   emitPipelineEvent?: (event: RunEvent) => void | Promise<void>;
-  commitMetadata?: Pick<Commit, "author" | "branch">;
+  commitMetadata?: Partial<Pick<Commit, "author" | "branch">>;
   /** API owner supplies its public evidence URL; default is the runtime path. */
   screenshotUrl?: (id: string) => string;
 }

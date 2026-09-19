@@ -4,7 +4,7 @@ import type { AgentTraceEvent, Assignment, AssignmentResult, DifferentialResult 
 export function initialRun(input: {
   runId: string; repo: string; head: string; base: string;
   previewUrl: string; baseUrl: string | null; prNumber?: number;
-  commitMetadata?: Pick<Commit, "author" | "branch">;
+  commitMetadata?: Partial<Pick<Commit, "author" | "branch">>;
 }, now = new Date().toISOString()): Run {
   return Run.parse({
     id: input.runId, repo: input.repo,

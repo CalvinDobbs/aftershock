@@ -25,6 +25,8 @@ export interface RunRecord {
   ref: string;
   baseRef: string;
   prNumber?: number;
+  /** From the webhook; null when the trigger did not say (a manual POST /runs). */
+  author: string | null;
   previewUrl: string | null;
   baseUrl: string | null;
   /**
@@ -63,6 +65,7 @@ export class InMemoryRunStore implements RunStore {
         existing.prNumber = input.prNumber;
       }
       if (input.previewUrl && !existing.previewUrl) existing.previewUrl = input.previewUrl;
+      if (input.author && !existing.author) existing.author = input.author;
       return existing;
     }
 
@@ -73,6 +76,7 @@ export class InMemoryRunStore implements RunStore {
       ref: input.ref,
       baseRef: input.baseRef,
       ...(input.prNumber !== undefined ? { prNumber: input.prNumber } : {}),
+      author: input.author ?? null,
       previewUrl: input.previewUrl ?? null,
       baseUrl: input.baseUrl ?? null,
       orchestratorRunId: null,
@@ -124,7 +128,7 @@ export function toSummary(run: RunRecord): RunSummary {
     sha: run.sha,
     message: "",
     branch: run.ref.replace(/^refs\/heads\//, ""),
-    author: "",
+    author: run.author ?? "",
     status: run.status,
     agentCount: 0,
     findingsConfirmed: 0,

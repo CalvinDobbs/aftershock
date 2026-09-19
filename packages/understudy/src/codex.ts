@@ -112,13 +112,14 @@ export type DiffReader = (workingDirectory: string) => Promise<string>;
  * after the work is already done. Letting the agent edit files and then asking
  * git what changed means the patch is real by construction.
  *
- * `--no-color` and a disabled external diff driver keep the output parseable
- * on a developer machine whose global gitconfig sets either.
+ * `--no-color` and `--no-ext-diff` keep the output parseable on a developer
+ * machine whose global gitconfig sets a colour or an external diff driver.
+ * Both are `git diff` options, so they must follow the `diff` subcommand.
  */
 export const gitDiff: DiffReader = async (workingDirectory) => {
   const { stdout } = await run(
     "git",
-    ["-c", "core.pager=cat", "--no-ext-diff", "diff", "--no-color", "--"],
+    ["-c", "core.pager=cat", "diff", "--no-ext-diff", "--no-color", "--"],
     { cwd: workingDirectory, maxBuffer: 32 * 1024 * 1024 },
   );
   return stdout;
