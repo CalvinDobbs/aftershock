@@ -21,12 +21,13 @@ function setup() {
     noiseFiltered: 0, findings: [raw], startedAt: "2026-09-19T10:00:00Z", finishedAt: "2026-09-19T10:00:01Z",
   }));
   return {
+    github: new GitHubClient(),
     runId: "run-test", repo: "demo/shop", base: "main", head: "feature",
     previewUrl: "https://preview.example", baseUrl: "https://base.example", maxConcurrent: 2,
     criticalJourney: { route: "/cart", description: "Open cart", steps: ["Open /cart"] },
     model: { complete: async () => ({ summary: "Refactor cart", claims: [], confidence: 0.9, assertions: [], blastRadius: ["cart"], riskScore: 0.5 }) },
     eventStream: new RunEventStream(new InMemoryEventRepository()),
-    screenshotRepository: { put: async () => "shot", get: async () => null },
+    screenshotRepository: { put: async () => "shot", get: async () => undefined },
     emitPipelineEvent: (event: PipelineEvent) => { events.push(RunEvent.parse(event)); },
   };
 }

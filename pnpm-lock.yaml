@@ -188,12 +188,21 @@ importers:
       '@aftershock/critic':
         specifier: workspace:*
         version: link:../../packages/critic
+      '@aftershock/curtain-call':
+        specifier: workspace:*
+        version: link:../../packages/curtain-call
       '@aftershock/schema':
         specifier: workspace:*
         version: link:../../packages/schema
       '@aftershock/scout':
         specifier: workspace:*
         version: link:../../packages/scout
+      '@aftershock/sleuth':
+        specifier: workspace:*
+        version: link:../../packages/sleuth
+      '@aftershock/understudy':
+        specifier: workspace:*
+        version: link:../../packages/understudy
       zod:
         specifier: ~4.4.3
         version: 4.4.3

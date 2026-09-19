@@ -54,3 +54,6 @@ export {
   FileScreenshotRepository,
   type ScreenshotRepository,
 } from "./screenshot-repository.js";
+
+export { runRepairChain, type RepairServices } from "./repair-chain.js";
+export { repairServicesFromEnv, parsePreviewCommand } from "./repair-services.js";

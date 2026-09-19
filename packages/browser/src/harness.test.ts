@@ -94,6 +94,25 @@ function clock() {
 describe("runAssignment", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("captures read-only checks without planning a click", async () => {
+    const session = fakeSession();
+    const { runAssignment } = await import("./harness.js");
+    const result = await runAssignment({ assignment: { ...baseAssignment, journey: [{ instruction: "Verify the total is $67.20" }] }, targetUrl: "https://preview.example", mode: "plan", side: "preview", emit: () => {}, config, sessionFactory: async () => session.value, settleMs: 0 });
+    expect(result.steps[0]?.action.method).toBe("snapshot");
+    expect(session.observe).not.toHaveBeenCalled(); expect(session.act).not.toHaveBeenCalled();
+  });
+
+  it("records the intended text and exact input when observe returns a wrapper click", async () => {
+    const session = fakeSession();
+    const evaluate = vi.fn().mockResolvedValueOnce("xpath=//input").mockResolvedValueOnce(undefined);
+    session.value.page.evaluate = evaluate;
+    const { runAssignment } = await import("./harness.js");
+    const result = await runAssignment({ assignment: { ...baseAssignment, journey: [{ instruction: "Enter 'SAVE20' in the code field" }] }, targetUrl: "https://preview.example", mode: "plan", side: "preview", emit: () => {}, config, sessionFactory: async () => session.value, settleMs: 0 });
+    expect(result.steps[0]?.action).toMatchObject({ method: "fill", selector: "xpath=//input", arguments: ["SAVE20"] });
+    expect(session.act).not.toHaveBeenCalled();
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
   it("plans, executes, captures, and emits the observable lifecycle", async () => {
     const session = fakeSession();
     const events: AgentEvent[] = [];

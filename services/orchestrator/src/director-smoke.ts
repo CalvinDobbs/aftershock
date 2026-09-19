@@ -31,6 +31,7 @@ try {
     body: JSON.stringify({ repo: "Nikhil-Doal/demo_site", base: "main", head: "feat/coupon-codes", prNumber: 2,
       previewUrl: process.env.MERIDIAN_PREVIEW_URL || "https://demo-site-36dnpbk4c-doalnikhilgmailcoms-projects.vercel.app",
       baseUrl: process.env.MERIDIAN_BASE_URL || "https://demo-site-hazel-beta.vercel.app",
+      routeSamples: { slug: "wool-scarf" },
       fallbackRoutes: ["/cart", "/checkout"],
       routeSetup: { "/checkout": ["Open /products/wool-scarf?reset=1", "Click the Add to cart button", "Open /checkout"] },
       criticalJourney: { route: "/cart", description: "Add a scarf and inspect the cart subtotal without a coupon",
@@ -44,12 +45,19 @@ try {
   const outcome = await finished;
   const detail = RunDetail.parse(outcome.detail);
   assert.equal(detail.run.id, runId);
+  const stored = await fetch(`http://127.0.0.1:${address.port}/runs/${runId}`).then(r => r.json());
+  assert.deepEqual(RunDetail.parse(stored), detail);
+  const stream = await fetch(`http://127.0.0.1:${address.port}/api/runs/${runId}/events/stream`).then(r => r.text());
+  assert.ok(stream.includes('"type":"critic.complete"'));
+  assert.ok(stream.includes('"type":"run.complete"'));
   assert.equal(events[0]?.type, "run.snapshot");
   assert.equal(events.at(-1)?.type, "run.complete");
   assert.ok(events.some((e) => e.type === "cast.dispatch"));
   assert.ok(events.some((e) => e.type === "critic.complete"));
   assert.ok(detail.assignments.some((a) => a.steps.some((s) => s.screenshotUrl && s.baseScreenshotUrl)), "Real paired evidence must reach product assignments");
   assert.ok(outcome.differential.some((pair) => pair.completed && pair.deltas.some((d) => d.preview.includes("$NaN"))), "The live commit must observe the planted cart regression");
+  assert.ok(detail.findings.some(f => f.class === "unclaimed_delta" && f.status === "confirmed" && f.actual.includes("$NaN")), "Cart regression must survive Critic");
+  assert.ok(detail.findings.some(f => f.class === "assertion_violation" && f.status === "confirmed" && f.actual.includes("84.00")), "Coupon total violation must survive Critic");
   const directory = join(dataDirectory, runId);
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, "detail.json"), JSON.stringify(detail, null, 2));

@@ -15,6 +15,8 @@ import { runObservableAssignment } from "./assignment-runner.js";
 import { runObservableDifferential } from "./differential-runner.js";
 import { RunEventStream, type EventRepository } from "./event-stream.js";
 import { JsonlEventRepository } from "./jsonl-event-repository.js";
+import { PipelineJournal } from "./pipeline-journal.js";
+import type { RepairServices } from "./repair-chain.js";
 import { runFromCommit } from "./commit-run.js";
 import { noiseCanary } from "./noise-canary.js";
 import {
@@ -29,11 +31,13 @@ export interface ObservabilityRuntimeOptions {
   browserbaseApiKey: string;
   /** Shauraya can supply Postgres without editing this module. */
   eventRepository?: EventRepository;
+  repairServices?: RepairServices;
   emitPipelineEvent?: (runId: string, event: RunEvent) => void | Promise<void>;
   onCommitRunComplete?: (runId: string, outcome: Awaited<ReturnType<typeof runFromCommit>>) => void | Promise<void>;
 }
 
 export interface ObservabilityRuntime {
+  pipelineJournal: PipelineJournal;
   eventStream: RunEventStream;
   screenshotRepository: FileScreenshotRepository;
   server: Server;
@@ -52,6 +56,7 @@ export interface ObservabilityRuntime {
 export function createObservabilityRuntime(
   options: ObservabilityRuntimeOptions,
 ): ObservabilityRuntime {
+  const pipelineJournal = new PipelineJournal(join(options.dataDirectory, "pipeline"));
   const eventStream = new RunEventStream(
     options.eventRepository ?? new JsonlEventRepository(join(options.dataDirectory, "traces")),
   );
@@ -159,9 +164,16 @@ export function createObservabilityRuntime(
       ...(request.maxConcurrent !== undefined ? { maxConcurrent: request.maxConcurrent } : {}),
       eventStream,
       screenshotRepository,
-      ...(options.emitPipelineEvent ? {
-        emitPipelineEvent: (event: RunEvent) => options.emitPipelineEvent!(runId, event),
-      } : {}),
+      ...(options.repairServices ? { repairServices: options.repairServices } : {}),
+      emitPipelineEvent: async (event: RunEvent) => {
+        await pipelineJournal.publish(runId, event);
+        await options.emitPipelineEvent?.(runId, event);
+      },
+      screenshotUrl: id => {
+        const address = server.address();
+        const origin = process.env.AFTERSHOCK_EVIDENCE_ORIGIN || `http://127.0.0.1:${address && typeof address !== "string" ? address.port : 3001}`;
+        return `${origin}/api/evidence/screenshots/${id}`;
+      },
     }).then(async (outcome) => {
       await options.onCommitRunComplete?.(runId, outcome);
     }).catch((error: unknown) => {
@@ -184,6 +196,7 @@ export function createObservabilityRuntime(
   };
 
   const server = createObservabilityServer({
+    pipelineJournal,
     eventStream,
     replayService: createSessionReplayService(options.browserbaseApiKey),
     screenshotRepository,
@@ -193,6 +206,7 @@ export function createObservabilityRuntime(
   });
 
   return {
+    pipelineJournal,
     eventStream,
     screenshotRepository,
     server,

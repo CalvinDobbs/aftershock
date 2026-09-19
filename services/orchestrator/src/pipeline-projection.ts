@@ -93,10 +93,11 @@ export function completedAssignment(
     product.status = "errored";
     product.trace.push({ seq: product.trace.length, at: product.finishedAt, content: failure ?? "The full comparison did not complete." });
   } else if (findings.length) product.status = "failed";
+  else if (result && "evaluation" in result && result.evaluation?.status === "passed") product.status = "passed";
   else if (assignment.archetype === "conformance") {
     product.status = "skipped";
     product.trace.push({ seq: product.trace.length, at: product.finishedAt,
-      content: "Browser steps completed; assertion evaluation is not implemented yet. This is not a passing assertion." });
+      content: result && "evaluation" in result && result.evaluation ? result.evaluation.reason : "Browser steps completed; assertion evaluation is not implemented yet. This is not a passing assertion." });
   } else if (result && "completed" in result && result.completed) {
     product.status = "passed";
     product.trace.push({ seq: product.trace.length, at: product.finishedAt, content: "Both deployments completed the same actions with no unclaimed differences." });

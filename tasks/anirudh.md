@@ -2,6 +2,12 @@
 
 ## Working checklist and handoff
 
+**Latest status:** Anirudh implementation is ready for integration. All 441 tests
+and typechecks pass. Final live acceptance `run-1789850852902-0` confirms both main
+Meridian bugs and the real dashboard renders them. Live GitHub issue/repair/PR
+publication has NOT been exercised; it remains opt-in deployment configuration.
+See the final handoff at the end of this file for exact commands and team seams.
+
 Branch: `codex/anirudh-critic-director` (started from `5e68795`). Never push to main.
 Update this section after each major implementation change. This file is the
 handoff source for the next agent; the original brief remains below.
@@ -13,11 +19,11 @@ handoff source for the next agent; the original brief remains below.
       Live differential verified; conformance evaluation/base-check integration remains below.
 - [x] Emit pipeline events from the Director and expose an injectable event sink
       for Shauraya's API/persistence work.
-- [ ] Wire Calvin's repair functions once available; expose explicit integration
-      seams meanwhile, without pretending an unavailable stage succeeded.
+- [x] Wire Calvin's real repair functions, retry/verification, publication and runtime configuration.
+      Live writes require the publishing environment described below.
 - [x] Run focused tests, `pnpm check`, and real demo tests; record commands/results.
-- [ ] Grade conformance assertions and connect real base checks to pre-existing rejection.
-- [ ] Resolve evidence-backed route confidence and rerun the two main demo bugs.
+- [x] Grade conformance assertions and connect real base checks to pre-existing rejection.
+- [x] Resolve evidence-backed route confidence and rerun the two main demo bugs.
 
 Scope: comparator/canary, Critic, and Director. Leave sidebar, budget tuning,
 session reapers, web/API implementation, and repair packages to their owners.
@@ -406,3 +412,100 @@ are not included in Git; teammates must configure their own environment.
 ### Final implementation pass
 
 Merged teammates main work; implementing conformance grading, import evidence, real repair wiring and the Director product API consumed by Shauraya. Final checks/live run pending.
+
+### Final pass implementation checkpoint
+
+- Merged main at `e745c68` into this feature branch, preserving teammate code.
+- Added evidence-cited conformance grading, baseline checks during reproduction,
+  exact input targeting and read-only journey captures. Live testing exposed
+  wrapper clicks that never typed coupon codes; input actions now resolve one
+  editable control and deliver native input/change events.
+- Added source-backed import tracing (including declared tsconfig aliases) from
+  changed shared modules to untouched pages. Live cart finding now confirms at
+  0.8625 without weakening confidence gates.
+- Director calls Calvin's real diagnose/repair/verify/publish exports. Deployment
+  and isolated checkout are supplied through `RepairServices`; missing adapters
+  remain explicit skips. Tests exercise success, two-failure draft, missing
+  baseline, and unconfigured services without writing external issues.
+- Product events are durable in `.aftershock/pipeline`; Director serves room
+  read endpoints `/runs`, `/runs/:id`, `/runs/:id/events` and product events on
+  `/api/runs/:id/events/stream` for Shauraya's proxy. Browser telemetry remains
+  available for legacy demos/canaries. No teammate implementation files edited.
+- Final live conformance and room checks still in progress.
+
+
+## Final implementation handoff — September 19
+
+### Verified
+
+- `pnpm check`: all typechecks, **441 tests** pass (70 orchestrator tests).
+- `AFTERSHOCK_EVIDENCE_ORIGIN=http://127.0.0.1:3003 node --env-file=.env --import tsx services/orchestrator/src/director-smoke.ts`
+  passed for **run-1789850852902-0**. This uses the actual HTTP trigger, Git commit
+  read, Scout model, remote Browserbase sessions, conformance grader, differential
+  comparator, Critic reproduction, durable product detail and replayable SSE.
+- Exactly two confirmed findings: cart `$84.00` -> `$NaN` at **0.8625**, coupon
+  summary/total not reflecting SAVE20 at **0.7475**, both observed 2/2.
+- Browser UI verified using an isolated unchanged copy of `apps/web` with
+  `AFTERSHOCK_API_URL=http://127.0.0.1:3003`. Room:
+  `http://localhost:3004/runs/run-1789850852902-0`. Screenshot fallback images load.
+  Servers currently retained: Director 3003; isolated dashboard 3004. Existing
+  user app on 3000 was not replaced. Temporary dashboard: `/tmp/aftershock-room-preview`.
+- Evidence and detail: `.aftershock/run-1789850852902-0/`; durable events:
+  `.aftershock/pipeline/`. These are ignored local artifacts, not Git contents.
+- Some additional Scout assertions remain inconclusive; partial coverage is
+  recorded, not silently promoted to passed. The two required demo findings pass.
+
+### What changed in this pass
+
+- Real conformance grading cites validated numbered lines in captured browser
+  evidence; model outages/invalid evidence return inconclusive. Read/check steps
+  capture without clicking. Input actions resolve one editable control and type
+  the requested value rather than accidentally clicking its parent wrapper.
+- Reproduction uses recorded Actions and compares observed failure evidence.
+  The baseline is actually exercised for conformance pre-existing rejection.
+- Shared-module import tracing uses captured source and configured aliases;
+  confidence gates are unchanged. REST failures fall back to read-only Git
+  transport for both commit intent and source. The fallback uses the merge-base
+  diff and real commit messages; it does not invent unavailable PR body text.
+- Calvin's actual diagnose/repair/verify/publish functions are connected. One
+  highest-ranked filed issue is repaired because RunDetail represents one repair;
+  up to three confirmed issues can be filed. Two failures produce an unverified
+  draft. Missing baseline, incomplete replay, and inconclusive grading cannot verify.
+- Isolated repair checkout creation and preview-command execution are built into
+  `repairServicesFromEnv`. No teammate-owned implementation files were modified.
+
+### Enabling live publication (configuration, not yet live-tested)
+
+`start.ts` enables repair only with BOTH `GITHUB_TOKEN` and
+`AFTERSHOCK_PREVIEW_COMMAND`. The command is a JSON argv array, runs in the actual
+patched checkout, must deploy those files, wait for readiness, and print its
+public HTTPS URL on its last stdout line. Existing env (including deployment
+credentials) is inherited. The command receives `AFTERSHOCK_PATCH_BRANCH`,
+`AFTERSHOCK_PATCH_ATTEMPT`, and `AFTERSHOCK_SOURCE_SHA`. The checkout is separate
+from this repo and is pinned to the tested commit. Set
+`AFTERSHOCK_REPAIR_BASE_BRANCH` for SHA-based triggers so the fix PR targets the
+actual feature branch. Never substitute the production baseline as the fix URL.
+
+Alternatively inject `RepairServices` into `createObservabilityRuntime` for the
+team's hosting adapter. The chain is tested using the real Calvin functions with
+controlled external dependencies, including retries and draft publication.
+No external demo issues or PRs were filed during these tests. Credentials stay in
+ignored env files; teammates need their own environment configuration.
+
+### Shauraya integration notes
+
+- Product reads: Director `GET /runs`, `/runs/:id` (validated RunDetail),
+  `/runs/:id/events`; alias `/api/runs/:id/detail`.
+- His existing event proxy to `/api/runs/:id/events/stream` now receives actual
+  RunEvents for commit runs. Legacy canary/demo streams keep AgentTraceEvents.
+- His `/runs/:id` route still returns the API RunRecord, not RunDetail. Proxy it
+  to the Director using `orchestratorRunId`, and materialize summaries if keeping
+  the API service as the dashboard origin. Direct Director reads already work.
+- UI issues observed in existing web code: confirmed count is labelled “filed”
+  despite `issues=[]`, and skipped assignments render as queued. The backend
+  accurately reports `filed:false`, skipped status and the reason. Do not use the
+  UI wording as proof of GitHub publication. Closed-session video was unavailable
+  in this keyless isolated frontend; real screenshot fallback evidence worked.
+
+Unrelated `Meridian prd.md` remains untracked and excluded. All implementation is
+on `codex/anirudh-critic-director`; never push main.

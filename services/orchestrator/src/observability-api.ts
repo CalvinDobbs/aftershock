@@ -5,6 +5,8 @@ import { z } from "zod";
 import type { AgentTraceEvent } from "@aftershock/schema/browser";
 import type { SessionReplayService } from "@aftershock/browser";
 
+import { servePipeline } from "./pipeline-http.js";
+import type { PipelineJournal } from "./pipeline-journal.js";
 import type { RunEventStream } from "./event-stream.js";
 import type { ScreenshotRepository } from "./screenshot-repository.js";
 
@@ -49,6 +51,7 @@ export type CommitRunRequest = z.infer<typeof CommitRunRequestSchema>;
 export type CommitRunLauncher = (request: CommitRunRequest) => { runId: string };
 
 export interface ObservabilityApiOptions {
+  pipelineJournal?: PipelineJournal;
   eventStream: RunEventStream;
   replayService: SessionReplayService;
   screenshotRepository: ScreenshotRepository;
@@ -107,6 +110,7 @@ export function createObservabilityHandler(options: ObservabilityApiOptions): Re
 
   return async (req, res) => {
     try {
+      if (options.pipelineJournal && await servePipeline(req, res, options.pipelineJournal)) return;
       const url = new URL(req.url ?? "/", "http://localhost");
       const segments = url.pathname.split("/").filter((part) => part.length > 0).map(decodeURIComponent);
 

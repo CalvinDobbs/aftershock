@@ -101,8 +101,9 @@ export async function judge(input: JudgeInput, options: JudgeOptions = {}): Prom
           adjust("Different failure mode (×0.60); needs review", confidence * 0.6);
           veto = "low_confidence";
         }
-      } catch {
-        modifiers.push({ label: "Reproduction could not complete; needs review", delta: 0 });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message.slice(0, 180) : "unknown error";
+        modifiers.push({ label: `Reproduction could not complete; needs review (${reason})`, delta: 0 });
         veto = "low_confidence";
       }
     };

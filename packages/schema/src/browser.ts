@@ -81,6 +81,7 @@ export const StepSnapshotSchema = z.object({
 });
 
 export const AssignmentStepResultSchema = z.object({
+  screenshotId: z.string().optional(),
   index: z.number().int().nonnegative(),
   instruction: z.string(),
   action: ActionSchema,
@@ -111,6 +112,7 @@ export const AssignmentResultSchema = z.object({
   sessionId: z.string(),
   steps: z.array(AssignmentStepResultSchema),
   findings: z.array(RawFindingSchema),
+  evaluation: z.object({ status: z.enum(["passed", "failed", "inconclusive"]), reason: z.string() }).optional(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime(),
 });
@@ -164,6 +166,7 @@ export const SnapshotDeltaSchema = z.object({
 export const DifferentialResultSchema = z.object({
   assignmentId: z.string(),
   previewSessionId: z.string(),
+  previewResult: AssignmentResultSchema.optional(),
   baseSessionId: z.string(),
   /** Every delta, including the ones that were dismissed. */
   deltas: z.array(SnapshotDeltaSchema),

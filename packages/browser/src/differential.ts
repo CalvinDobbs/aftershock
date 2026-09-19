@@ -135,6 +135,7 @@ export async function runDifferential(
       return DifferentialResultSchema.parse({
         assignmentId: assignment.id,
         previewSessionId: preview.sessionId,
+        previewResult: preview,
         baseSessionId: "",
         deltas: [],
         noiseFiltered: 0,
@@ -219,6 +220,7 @@ export async function runDifferential(
   return DifferentialResultSchema.parse({
     assignmentId: assignment.id,
     previewSessionId: preview.sessionId,
+    previewResult: { ...preview, findings: outcome.findings },
     baseSessionId: base.sessionId,
     deltas: outcome.deltas,
     noiseFiltered: outcome.noiseFiltered,

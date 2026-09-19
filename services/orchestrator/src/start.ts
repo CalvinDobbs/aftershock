@@ -1,3 +1,4 @@
+import { repairServicesFromEnv } from "./repair-services.js";
 import { resolveDataDirectory } from "./data-directory.js";
 import { createObservabilityRuntime } from "./runtime.js";
 
@@ -10,7 +11,8 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 }
 
 const dataDirectory = resolveDataDirectory();
-const runtime = createObservabilityRuntime({ dataDirectory, browserbaseApiKey: apiKey });
+const repairServices = repairServicesFromEnv();
+const runtime = createObservabilityRuntime({ dataDirectory, browserbaseApiKey: apiKey, ...(repairServices ? { repairServices } : {}) });
 
 runtime.server.listen(port, "127.0.0.1", () => {
   const address = runtime.server.address();

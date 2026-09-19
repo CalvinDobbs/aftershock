@@ -4,7 +4,7 @@ import type {
   DifferentialResult,
 } from "@aftershock/schema/browser";
 import { RunDetail, type Commit, type Finding, type Run, type RunEvent, type Stage, type TestCharter } from "@aftershock/schema";
-import { isReplayable, withRecordedActions } from "@aftershock/browser";
+import { AssignmentFailedError, isReplayable, withRecordedActions } from "@aftershock/browser";
 import { authorIssue, judge, selectIssues, type IssueDraft } from "@aftershock/critic";
 import {
   GitHubClient,
@@ -23,6 +23,10 @@ import { runObservableAssignment } from "./assignment-runner.js";
 import { runObservableDifferential } from "./differential-runner.js";
 import type { RunEventStream } from "./event-stream.js";
 import type { ScreenshotRepository } from "./screenshot-repository.js";
+import { runRepairChain, type RepairServices } from "./repair-chain.js";
+import { gitIntent } from "./git-intent.js";
+import { gradeConformance, cleanEvidence } from "./conformance.js";
+import { githubSource, sourceRoutes, type SourceSnapshot } from "./source-routes.js";
 import { initialRun, queuedAssignment, completedAssignment } from "./pipeline-projection.js";
 
 /**
@@ -59,6 +63,8 @@ export interface CommitRunOptions {
   screenshotRepository: ScreenshotRepository;
   github?: GitHubClient;
   model?: CharterModel;
+  repairServices?: RepairServices;
+  sourceSnapshot?: (repo: string, ref: string) => Promise<SourceSnapshot>;
   /** Shauraya's API/persistence consumes these product events, separate from browser telemetry. */
   emitPipelineEvent?: (event: RunEvent) => void | Promise<void>;
   commitMetadata?: Pick<Commit, "author" | "branch">;
@@ -128,6 +134,7 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
   const publish = async (event: RunEvent) => {
     const completed: Partial<Record<RunEvent["type"], Stage>> = {
       "scout.complete": "scout", "cast.complete": "cast", "critic.complete": "critic",
+      "sleuth.complete": "sleuth", "understudy.complete": "understudy", "curtaincall.complete": "curtain_call",
     };
     const stageName = event.type === "stage.start" || event.type === "stage.skip" ? event.stage : completed[event.type];
     const stage = run.stages.find((s) => s.stage === stageName);
@@ -147,6 +154,10 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
     base: options.base,
     head: options.head,
     ...(options.prNumber !== undefined ? { prNumber: options.prNumber } : {}),
+  }).catch(async error => {
+    if (options.github) throw error;
+    const read = await gitIntent(options.repo, options.base, options.head);
+    return { ...read, ...(options.prNumber !== undefined ? { prNumber: options.prNumber } : {}) };
   });
   run.commit = { ...run.commit, sha: intent.headSha, message: intent.messages.at(-1) ?? "No commit message",
     filesChanged: intent.files.length,
@@ -155,10 +166,19 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
     ...(intent.prTitle ? { prTitle: intent.prTitle } : {}) };
   await publish({ type: "run.snapshot", run });
 
-  const surfaces = mapRoutes(intent.files, {
+  let surfaces = mapRoutes(intent.files, {
     ...(options.fallbackRoutes ? { fallbackRoutes: options.fallbackRoutes } : {}),
   });
 
+  try {
+    const load = options.sourceSnapshot ?? (!options.github ? githubSource : undefined);
+    if (load) {
+      const source = await load(options.repo, intent.headSha);
+      intent.headSha = source.sha;
+      run.commit.sha = source.sha;
+      surfaces = sourceRoutes(intent, source.files, surfaces);
+    }
+  } catch { /* Preserve the honest fallback map when source is unavailable. */ }
   const charterInput = {
     runId,
     intent,
@@ -172,7 +192,9 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
   // rather than aborting it.
   let charter: TestCharter;
   try {
-    charter = await inferCharter(charterInput, { model: options.model ?? openAiModel() });
+    const model = options.model ?? openAiModel();
+    charter = await inferCharter(charterInput, { model: { complete: input => model.complete({ ...input,
+      user: input.user + "\nProject journey configuration (use these exact paths and sample values; setup is prepended automatically):\n" + JSON.stringify({ routeSamples: options.routeSamples, routeSetup: options.routeSetup, criticalJourney: options.criticalJourney }) }) } });
   } catch {
     charter = smokeCharter(charterInput);
   }
@@ -241,9 +263,21 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
         eventStream,
         screenshotRepository,
       });
+    if (assignment.archetype === "conformance") {
+      const assertion = charter.assertions.find(a => a.id === assignment.assertionId);
+      if (assertion) result = await gradeConformance(result, assignment, assertion, options.model ?? openAiModel());
+    }
     conformance.push(result);
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
+      if (error instanceof AssignmentFailedError) {
+        result = error.result;
+        const assertion = charter.assertions.find(a => a.id === assignment.assertionId);
+        if (assertion && assignment.archetype === "conformance") {
+          result = await gradeConformance(result, assignment, assertion, options.model ?? openAiModel());
+          conformance.push(result);
+        }
+      }
       throw error;
     } finally {
       const projected = completedAssignment(assignment, await eventStream.history(runId), result, failure, options.screenshotUrl);
@@ -279,7 +313,7 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
   await publish({ type: "cast.complete" });
   await publish({ type: "stage.start", stage: "critic" });
   const findings = await judge({ runId, charter, assignments, conformance, differential }, {
-    reproduce: async ({ assignmentId, attempt }) => {
+    reproduce: async ({ assignmentId, finding, attempt }) => {
       const original = assignments.find((a) => a.id === assignmentId);
       if (!original) throw new Error(`Missing assignment ${assignmentId}`);
       const pair = differential.find((r) => r.assignmentId === assignmentId);
@@ -296,20 +330,74 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
         if (!replay.completed) throw new Error("Reproduction did not complete on both deployments");
         return { findings: replay.findings };
       }
-      const replay = await runObservableAssignment({ assignment, targetUrl: previewUrl,
-        mode: "replay", side: "preview", eventStream, screenshotRepository });
-      // Conformance assertion evaluation is a separate implementation task;
-      // an empty result here cannot promote a finding.
-      return { findings: replay.findings };
+      const assertion = charter.assertions.find(a => a.id === original.assertionId);
+      if (!assertion) throw new Error("Missing cited assertion");
+      const evaluate = async (url: string, side: "preview" | "base") => {
+        let replay: AssignmentResult;
+        try {
+          replay = await runObservableAssignment({ assignment, targetUrl: url,
+            mode: "replay", side, eventStream, screenshotRepository });
+        } catch (error) {
+          if (!(error instanceof AssignmentFailedError)) throw error;
+          replay = error.result;
+        }
+        return gradeConformance(replay, assignment, assertion, options.model ?? openAiModel());
+      };
+      const replay = await evaluate(previewUrl, "preview");
+      const quotes = finding.evidence.filter(e => /^step \d+: /.test(e)).map(e => e.replace(/^step \d+: /, ""));
+      const same = (r: AssignmentResult) => r.evaluation?.status === "failed" && quotes.length > 0
+        && quotes.every(q => r.steps.some(s => cleanEvidence(s.snapshot.formattedTree).includes(q)));
+      const base = baseUrl ? await evaluate(baseUrl, "base") : undefined;
+      if (replay.evaluation?.status === "inconclusive") throw new Error(`Replay grading inconclusive: ${replay.evaluation.reason}`);
+      return { findings: same(replay) ? [finding] : replay.findings, preExisting: base ? same(base) : false };
     },
   });
   await publish({ type: "critic.complete", findings });
   const issueDrafts = await Promise.all(selectIssues(findings).map(authorIssue));
-  for (const stage of ["sleuth", "understudy", "curtain_call"] as const) {
-    await publish({ type: "stage.skip", stage, note: issueDrafts.length
-      ? "Confirmed findings retained; GitHub filing and repair integration are not connected yet."
-      : "No confirmed issue to repair." });
-  }
+  const recordedFailures = assignments.flatMap(assignment => {
+    const pair = differential.find(r => r.assignmentId === assignment.id);
+    const captured = conformance.find(r => r.assignmentId === assignment.id);
+    const before = pair?.previewResult ?? captured;
+    const recorded = pair?.recordedAssignment ?? (captured ? withRecordedActions(assignment, captured) : null);
+    return before && recorded && isReplayable(recorded) && recorded.journey.length === assignment.journey.length
+      && before.findings.length ? [{ assignment: recorded, before }] : [];
+  });
+  const repairFields = await runRepairChain({ runId, intent, baseBranch: options.head, baseUrl, findings,
+    drafts: issueDrafts, failed: recordedFailures,
+    regressionSuite: differential.flatMap(d => d.recordedAssignment ? [d.recordedAssignment] : []),
+    emit: publish, ...(options.repairServices ? { services: options.repairServices } : {}),
+    browser: {
+      screenshotUrlFor: result => {
+        const id = result.steps.at(-1)?.screenshotId;
+        return id ? (options.screenshotUrl?.(id) ?? `/api/evidence/screenshots/${id}`) : null;
+      },
+      runDifferential: async input => {
+        const result = await runObservableDifferential({ ...input, claims: charter.intent.claims, eventStream, screenshotRepository });
+        if (!result.completed) throw new Error("Verification comparison incomplete");
+        return result;
+      },
+      runAssignment: async input => {
+        // Checklist assertions reuse a captured failing journey to establish real state.
+        const original = input.assignment.id.startsWith("check-")
+          ? recordedFailures.find(f => f.assignment.route === input.assignment.route)?.assignment : input.assignment;
+        if (!original) throw new Error("No recorded journey for the checklist");
+        if (original.archetype === "differential") {
+          if (!baseUrl) throw new Error("Verification requires a baseline");
+          const pair = await runObservableDifferential({ assignment: { ...original, id: input.assignment.id },
+            previewUrl: input.targetUrl, baseUrl, claims: charter.intent.claims, eventStream, screenshotRepository });
+          if (!pair.completed || !pair.previewResult) throw new Error("Verification comparison incomplete");
+          return { ...pair.previewResult, findings: pair.findings };
+        }
+        const assignment = { ...original, id: input.assignment.id };
+        const result = await runObservableAssignment({ ...input, assignment, mode: "replay", eventStream, screenshotRepository });
+        const assertion = charter.assertions.find(a => a.id === original.assertionId);
+        if (!assertion) throw new Error("Missing verification assertion");
+        const graded = await gradeConformance(result, assignment, assertion, options.model ?? openAiModel());
+        if (graded.evaluation?.status === "inconclusive") throw new Error("Verification assertion inconclusive");
+        return graded;
+      },
+    },
+  });
   const incomplete = [...productAssignments.values()].filter((a) => a.status === "errored" || a.status === "skipped").length + skipped.length;
   if (incomplete || assignments.length === 0) {
     run.stages.find((s) => s.stage === "cast")!.note = `${incomplete} incomplete assignments; ${assignments.length} assignments planned. Coverage is partial.`;
@@ -318,7 +406,7 @@ async function executeCommitRun(options: CommitRunOptions, run: Run): Promise<Co
   run.finishedAt = new Date().toISOString();
   await publish({ type: "run.complete", run });
   const detail = RunDetail.parse({ run, charter, assignments: [...productAssignments.values()], findings,
-    issues: [], diagnosis: null, patch: null, verification: null, pullRequest: null });
+    ...repairFields });
   return { charter, assignments, conformance, differential, skipped: allSkipped, findings, issueDrafts, detail };
 }
 
