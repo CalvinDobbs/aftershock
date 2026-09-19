@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/start.ts",
+    "dev": "node --env-file=../../.env --import tsx src/start.ts",
     "smoke": "tsx src/smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
