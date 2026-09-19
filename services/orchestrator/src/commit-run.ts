@@ -48,6 +48,8 @@ export interface CommitRunOptions {
   criticalJourney?: CriticalJourney;
   fallbackRoutes?: string[];
   routeSamples?: Record<string, string>;
+  /** Steps that put the app into the state a route needs. See toAssignments. */
+  routeSetup?: Record<string, string[]>;
   maxConcurrent?: number;
 
   eventStream: RunEventStream;
@@ -125,6 +127,7 @@ export async function runFromCommit(options: CommitRunOptions): Promise<CommitRu
   const { assignments, skipped } = toAssignments(charter, {
     runId,
     ...(options.routeSamples ? { routeSamples: options.routeSamples } : {}),
+    ...(options.routeSetup ? { routeSetup: options.routeSetup } : {}),
   });
 
   // Risk drives the fleet: a one-line CSS change does not deserve the same

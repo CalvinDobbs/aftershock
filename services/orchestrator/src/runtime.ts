@@ -149,6 +149,7 @@ export function createObservabilityRuntime(
       baseUrl: request.baseUrl ?? null,
       ...(request.fallbackRoutes ? { fallbackRoutes: request.fallbackRoutes } : {}),
       ...(request.routeSamples ? { routeSamples: request.routeSamples } : {}),
+      ...(request.routeSetup ? { routeSetup: request.routeSetup } : {}),
       // Rebuilt rather than spread: zod infers `route?: string | undefined`
       // and the interface asks for `route?: string`, which
       // exactOptionalPropertyTypes treats as different types.

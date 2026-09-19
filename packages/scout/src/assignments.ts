@@ -36,10 +36,30 @@ export interface ToAssignmentsOptions {
   runId: string;
   /** Values for dynamic segments, e.g. `{ slug: "wool-scarf" }`. */
   routeSamples?: Record<string, string>;
+  /**
+   * Steps prepended to every assignment on a route, to put the app in the
+   * state that route needs before anything is asserted.
+   *
+   * This is project knowledge, not something a model should infer from a
+   * diff. A checkout page with an empty cart renders "nothing in your cart",
+   * so an agent sent straight there finds no coupon field and reports a
+   * missing feature — a bug in the journey that reads as a bug in the app.
+   * Scout can be told to seed state and mostly will; configuring it is
+   * deterministic, and the demo cannot afford mostly.
+   *
+   * Keyed by route. `{ "/checkout": ["Go to /products/x", "Click add to
+   * cart", "Go to /checkout"] }`.
+   */
+  routeSetup?: Record<string, string[]>;
 }
 
 function journeyFor(assertion: Assertion): string[] {
-  const steps = (assertion.steps ?? []).filter((s) => s.trim().length > 0);
+  const steps = (assertion.steps ?? [])
+    .filter((s) => s.trim().length > 0)
+    // Scout is told the browser already starts on the route, but a model
+    // will still open with "go to /checkout" now and then. Harmless when
+    // setup steps precede it, redundant otherwise, so it is dropped.
+    .filter((s, i) => !(i === 0 && new RegExp(`^(?:go|navigate)\\s+to\\s+(?:the\\s+)?${assertion.route}/?$`, "i").test(s.trim())));
   if (steps.length > 0) return steps;
   // A statement is a poor instruction, but it is better than dropping the
   // assertion — Stagehand can often act on it, and a skipped assertion is a
@@ -65,7 +85,8 @@ export function toAssignments(
       continue;
     }
 
-    const journey = journeyFor(assertion);
+    const setup = options.routeSetup?.[assertion.route] ?? [];
+    const journey = [...setup, ...journeyFor(assertion)];
     if (journey.length === 0) {
       skipped.push({ assertionId: assertion.id, reason: "no steps and no statement to act on" });
       continue;

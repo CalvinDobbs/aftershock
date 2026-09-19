@@ -216,10 +216,13 @@ function treeDeltas(
   const classified = pairLines(removed, added).map(([from, to]) => {
       const field = fieldOf(from || to) || "tree";
 
-      // Platform chrome: a preview toolbar the production deployment has no
-      // reason to carry. Present on one side by construction, so it would
-      // otherwise be an unclaimed delta on every step of every run.
-      if (isInjectedWidget(from) || isInjectedWidget(to)) {
+      // Platform chrome, and nodes with no accessible name at all — an
+      // unnamed image is unreadable to a person and so cannot be a finding.
+      if (
+        isInjectedWidget(from) ||
+        isInjectedWidget(to) ||
+        isAnonymous(from || to)
+      ) {
         return {
           stepIndex,
           channel: "tree" as const,
@@ -384,6 +387,32 @@ export function compareSnapshots(
 
 // --- deltas to findings -----------------------------------------------------
 
+/**
+ * Values that mean the app failed to compute something, not that it computed
+ * a different answer.
+ *
+ * `$NaN` where a price belongs is not a changed number — it is a broken one,
+ * and it is the strongest evidence a differential can produce. It also
+ * explains every other delta on that step: when a formatter breaks, every
+ * value it formatted vanishes at once.
+ */
+const CORRUPT_VALUE = /\b(?:NaN|undefined|null|Infinity|\[object Object\])\b/;
+
+export function isCorruptValue(text: string): boolean {
+  return CORRUPT_VALUE.test(text);
+}
+
+/**
+ * A node with a role but no accessible name.
+ *
+ * Nothing a person can read, so it cannot be a finding on its own. These are
+ * almost always injected chrome — the image inside a preview toolbar — and
+ * reporting them is noise dressed as a regression.
+ */
+function isAnonymous(value: string): boolean {
+  return /^[a-z]+$/i.test(value.trim());
+}
+
 const SEVERITY: Record<DeltaChannel, RawFinding["severity"]> = {
   url: "critical", // the journey went somewhere else
   network: "critical", // a request that only fails here
@@ -395,6 +424,8 @@ const SEVERITY: Record<DeltaChannel, RawFinding["severity"]> = {
 
 function severityFor(delta: SnapshotDelta): RawFinding["severity"] {
   if (delta.channel === "network" && /^4\d\d$/.test(delta.preview)) return "high";
+  // A value the app failed to compute outranks a value it merely changed.
+  if (isCorruptValue(delta.preview) && !isCorruptValue(delta.base)) return "critical";
   return SEVERITY[delta.channel];
 }
 
@@ -422,8 +453,28 @@ export function findingsFrom(deltas: readonly SnapshotDelta[]): RawFinding[] {
     .filter((d) => d.channel === "url" && d.classification === "unclaimed")
     .reduce<number | null>((min, d) => (min === null ? d.stepIndex : Math.min(min, d.stepIndex)), null);
 
+  /**
+   * Steps where the preview produced a corrupt value.
+   *
+   * A broken formatter takes out every value it touched, so the same step
+   * shows the corrupt one appearing and several good ones vanishing. Those
+   * disappearances are the same bug, not four more — a real run reported six
+   * findings where the honest answer is one.
+   */
+  const corruptedSteps = new Set(
+    deltas
+      .filter((d) => d.classification === "unclaimed" && isCorruptValue(d.preview))
+      .map((d) => d.stepIndex),
+  );
+
   const downstream = (d: SnapshotDelta) =>
-    divergedAt !== null && d.channel !== "url" && d.stepIndex >= divergedAt;
+    (divergedAt !== null && d.channel !== "url" && d.stepIndex >= divergedAt) ||
+    // A value that simply vanished on a step that also produced a corrupt
+    // one is that corruption's shadow.
+    (corruptedSteps.has(d.stepIndex) &&
+      d.channel === "tree" &&
+      d.preview === "—" &&
+      !isCorruptValue(d.base));
 
   for (const d of deltas) {
     if (d.classification !== "unclaimed") continue;

@@ -109,3 +109,45 @@ describe("dispatchOrder", () => {
     expect(order[0]!.id).toBe("D1");
   });
 });
+
+describe("routeSetup", () => {
+  it("puts the app into the state a route needs before asserting", () => {
+    // Checkout with an empty cart renders an empty state, so an agent sent
+    // straight there finds no coupon field and reports a missing feature.
+    const { assignments } = toAssignments(
+      charter([
+        {
+          id: "A1", type: "conformance", route: "/checkout",
+          statement: "SAVE20 reduces the total",
+          steps: ["Enter SAVE20 into the coupon field", "Click Apply"],
+          severity: "critical",
+        },
+      ]),
+      {
+        runId: "r",
+        routeSetup: {
+          "/checkout": ["Go to /products/wool-scarf", "Click add to cart", "Go to /checkout"],
+        },
+      },
+    );
+
+    expect(assignments[0]!.journey.map((j) => j.instruction)).toEqual([
+      "Go to /products/wool-scarf",
+      "Click add to cart",
+      "Go to /checkout",
+      "Enter SAVE20 into the coupon field",
+      "Click Apply",
+    ]);
+  });
+
+  it("drops a redundant opening navigation to the route it already starts on", () => {
+    const { assignments } = toAssignments(
+      charter([
+        { id: "A1", type: "conformance", route: "/cart", statement: "x",
+          steps: ["Go to /cart", "Read the subtotal"], severity: "low" },
+      ]),
+      { runId: "r" },
+    );
+    expect(assignments[0]!.journey.map((j) => j.instruction)).toEqual(["Read the subtotal"]);
+  });
+});

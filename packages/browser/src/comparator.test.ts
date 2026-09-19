@@ -365,3 +365,37 @@ describe("platform chrome", () => {
     expect(unclaimed[0]!.preview).toContain("$NaN");
   });
 });
+
+describe("a broken formatter is one finding", () => {
+  it("reports the corrupt value, not every value it took out", async () => {
+    // A real run against the demo storefront reported six findings for one
+    // bug: $NaN appearing, and $84.00 / $28.00 / $112.00 vanishing because
+    // the same formatter produced all of them.
+    const { findingsFrom } = await import("./comparator.js");
+    const d = (base: string, preview: string) => ({
+      stepIndex: 3, channel: "tree" as const, field: base || preview,
+      base, preview, classification: "unclaimed" as const, reason: "r",
+    });
+
+    const findings = findingsFrom([
+      d("StaticText: $84.00", "—"),
+      d("StaticText: $28.00", "—"),
+      d("StaticText: $112.00", "—"),
+      d("—", "StaticText: $NaN"),
+    ]);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.summary).toContain("$NaN");
+    // A value the app failed to compute is not a medium.
+    expect(findings[0]!.severity).toBe("critical");
+  });
+
+  it("still reports an ordinary value change at its normal severity", async () => {
+    const { findingsFrom } = await import("./comparator.js");
+    const findings = findingsFrom([
+      { stepIndex: 0, channel: "tree", field: "total", base: "$84.00", preview: "$67.20",
+        classification: "unclaimed", reason: "r" },
+    ]);
+    expect(findings[0]!.severity).toBe("medium");
+  });
+});

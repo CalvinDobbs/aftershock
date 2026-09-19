@@ -34,6 +34,7 @@ export const CommitRunRequestSchema = z.object({
   // answer 202 then dispatch zero assignments.
   fallbackRoutes: z.array(z.string().startsWith("/", "routes must start with /")).optional(),
   routeSamples: z.record(z.string(), z.string()).optional(),
+  routeSetup: z.record(z.string(), z.array(z.string().min(1))).optional(),
   criticalJourney: z
     .object({
       description: z.string().min(1),
