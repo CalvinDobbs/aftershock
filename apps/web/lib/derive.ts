@@ -16,23 +16,27 @@ export function lastBot(r: RunSummary): BotId | 'run' {
   if (r.status === 'running' || r.status === 'pending') return 'run';
   if (r.status === 'failed') return 'maestro';
   if (r.status === 'no_findings') return 'doppler';
+  // The Cast only owns the row once it has actually re-run the fix.
+  if (r.verified) return 'qaizen';
   return r.prNumber ? 'patchouli' : 'gavel';
 }
 
 /**
  * One-line preview under a run in the sidebar.
  *
- * PLACEHOLDER — "verified" is asserted from the presence of a PR.
- * RunSummary has no verification flag, so a PR opened as a draft marked
- * `aftershock:unverified` reads here as verified, which is the one claim this
- * product must never get wrong. Add `verified: boolean` to RunSummary.
+ * `verified` comes from Curtain Call actually re-running the failing work
+ * against the patch. It is never inferred from a pull request existing:
+ * Understudy opens a draft labelled `aftershock:unverified` after two failed
+ * attempts, and calling that verified is the product lying about the one
+ * thing it exists to prove.
  */
 export function preview(r: RunSummary): string {
   if (r.status === 'pending') return 'waiting for the preview deployment';
   if (r.status === 'running') return 'Diffany is reading the diff…';
   if (r.status === 'failed') return 'run failed — partial results kept';
   if (r.status === 'no_findings') return `nothing to report. ${r.findingsRaised} raised, all discarded`;
-  if (r.prNumber) return `Patchouli opened #${r.prNumber}, re-run came back green`;
+  if (r.prNumber && r.verified) return `#${r.prNumber} opened, the re-run came back green`;
+  if (r.prNumber) return `#${r.prNumber} opened as a draft — the fix is not proven`;
   return `${r.findingsConfirmed} filed of ${r.findingsRaised} raised`;
 }
 

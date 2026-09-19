@@ -69,5 +69,15 @@ export const RunSummary = z.object({
   durationMs: z.number().nullable(),
   startedAt: z.string(),
   prNumber: z.number().nullable(),
+  /**
+   * Whether Curtain Call actually re-ran the failing work against the patch
+   * and it came back green.
+   *
+   * Never infer this from a pull request existing. Understudy's retry policy
+   * opens a draft labelled `aftershock:unverified` after two failed attempts,
+   * and a run that renders that as verified is the product lying about the
+   * one thing it exists to prove. Sourced from `Verification.passed`.
+   */
+  verified: z.boolean().default(false),
 });
 export type RunSummary = z.infer<typeof RunSummary>;
