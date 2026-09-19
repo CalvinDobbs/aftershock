@@ -4,10 +4,12 @@ import type { AgentTraceEvent } from "@aftershock/schema";
 import type { SessionReplayService } from "@aftershock/browser";
 
 import type { RunEventStream } from "./event-stream.js";
+import type { ScreenshotRepository } from "./screenshot-repository.js";
 
 export interface ObservabilityApiOptions {
   eventStream: RunEventStream;
   replayService: SessionReplayService;
+  screenshotRepository: ScreenshotRepository;
 }
 
 function sendJson(res: Parameters<RequestListener>[1], status: number, body: unknown): void {
@@ -28,7 +30,7 @@ function writeTrace(res: Parameters<RequestListener>[1], trace: AgentTraceEvent)
 }
 
 export function createObservabilityHandler(options: ObservabilityApiOptions): RequestListener {
-  const { eventStream, replayService } = options;
+  const { eventStream, replayService, screenshotRepository } = options;
 
   return async (req, res) => {
     try {
@@ -62,6 +64,7 @@ export function createObservabilityHandler(options: ObservabilityApiOptions): Re
           connection: "keep-alive",
           "x-accel-buffering": "no",
         });
+        res.write(": connected\n\n");
 
         let lastSent = -1;
         let historyDone = false;
@@ -87,6 +90,26 @@ export function createObservabilityHandler(options: ObservabilityApiOptions): Re
           unsubscribe();
           sendError(res, error);
         }
+        return;
+      }
+
+      if (
+        req.method === "GET" &&
+        segments.length === 4 &&
+        segments[0] === "api" &&
+        segments[1] === "evidence" &&
+        segments[2] === "screenshots"
+      ) {
+        const body = await screenshotRepository.get(segments[3]!);
+        if (body === undefined) {
+          sendJson(res, 404, { error: "Not found" });
+          return;
+        }
+        res.writeHead(200, {
+          "content-type": "image/png",
+          "cache-control": "private, max-age=31536000, immutable",
+        });
+        res.end(body);
         return;
       }
 

@@ -133,6 +133,7 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     type: z.literal("step.captured"),
     index: z.number().int().nonnegative(),
     url: z.string().url(),
+    screenshotId: z.string().optional(),
     network: NetworkSummarySchema,
     consoleErrors: z.array(ConsoleEntrySchema),
   }),

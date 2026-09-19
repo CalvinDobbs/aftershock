@@ -11,12 +11,22 @@ import { loadBrowserConfig, type BrowserConfig } from "./config.js";
 import { collectSessionEvidence } from "./evidence.js";
 import { launchBrowserSession, type BrowserSession, type BrowserSessionFactory } from "./session.js";
 
+export interface ScreenshotCapture {
+  runId: string;
+  assignmentId: string;
+  index: number;
+  body: Uint8Array;
+}
+
+export type ScreenshotWriter = (capture: ScreenshotCapture) => Promise<string>;
+
 export interface RunAssignmentOptions {
   assignment: Assignment;
   targetUrl: string;
   mode: "plan" | "replay";
   side: "preview" | "base" | "fix";
   emit: (event: AgentEvent) => void | Promise<void>;
+  writeScreenshot?: ScreenshotWriter;
   config?: BrowserConfig;
   sessionFactory?: BrowserSessionFactory;
   now?: () => number;
@@ -59,6 +69,7 @@ export async function runAssignment(options: RunAssignmentOptions) {
     mode,
     side,
     emit,
+    writeScreenshot,
     config = loadBrowserConfig(),
     sessionFactory = launchBrowserSession,
     now = Date.now,
@@ -129,6 +140,15 @@ export async function runAssignment(options: RunAssignmentOptions) {
         session.page.url(),
         collectSessionEvidence(session.browserbase, session.sessionId),
       ]);
+      const screenshotBody = Uint8Array.from(screenshot);
+      const screenshotId = writeScreenshot
+        ? await writeScreenshot({
+            runId: assignment.runId,
+            assignmentId: assignment.id,
+            index,
+            body: screenshotBody,
+          })
+        : undefined;
       const result = {
         index,
         instruction: journeyStep.instruction,
@@ -136,7 +156,7 @@ export async function runAssignment(options: RunAssignmentOptions) {
         snapshot: {
           url,
           formattedTree: snapshot.formattedTree,
-          screenshot: Uint8Array.from(screenshot),
+          screenshot: screenshotBody,
           network: evidence.network,
           console: evidence.console,
         },
@@ -149,6 +169,7 @@ export async function runAssignment(options: RunAssignmentOptions) {
         type: "step.captured",
         index,
         url,
+        ...(screenshotId ? { screenshotId } : {}),
         network: evidence.network,
         consoleErrors: evidence.console.filter((entry) => entry.level === "error"),
       });

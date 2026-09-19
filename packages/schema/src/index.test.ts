@@ -45,4 +45,21 @@ describe("AgentEventSchema", () => {
 
     expect(event.type).toBe("session.opened");
   });
+
+  it("parses step.captured with a screenshotId", () => {
+    const event = AgentEventSchema.parse({
+      type: "step.captured",
+      runId: "run-1",
+      assignmentId: "assignment-1",
+      timestamp: "2026-09-19T12:00:00.000Z",
+      index: 0,
+      url: "https://example.com/checkout",
+      screenshotId: "screenshot-1",
+      network: { requestCount: 1, failedRequests: [] },
+      consoleErrors: [],
+    });
+
+    expect(event.type).toBe("step.captured");
+    if (event.type === "step.captured") expect(event.screenshotId).toBe("screenshot-1");
+  });
 });

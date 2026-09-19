@@ -10,3 +10,16 @@ export {
   createObservabilityServer,
   type ObservabilityApiOptions,
 } from "./observability-api.js";
+export {
+  runObservableAssignment,
+  type ObservableAssignmentOptions,
+} from "./assignment-runner.js";
+export {
+  createObservabilityRuntime,
+  type ObservabilityRuntime,
+  type ObservabilityRuntimeOptions,
+} from "./runtime.js";
+export {
+  FileScreenshotRepository,
+  type ScreenshotRepository,
+} from "./screenshot-repository.js";

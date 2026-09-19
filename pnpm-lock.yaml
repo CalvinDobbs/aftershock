@@ -29,6 +29,10 @@ importers:
       '@aftershock/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+    devDependencies:
+      tsx:
+        specifier: 4.20.5
+        version: 4.20.5
 
   packages/browser:
     dependencies:

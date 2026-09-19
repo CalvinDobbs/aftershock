@@ -95,6 +95,7 @@ describe("runAssignment", () => {
   it("plans, executes, captures, and emits the observable lifecycle", async () => {
     const session = fakeSession();
     const events: AgentEvent[] = [];
+    const writeScreenshot = vi.fn().mockResolvedValue("screenshot-1");
     const { runAssignment } = await import("./harness.js");
 
     const result = await runAssignment({
@@ -105,6 +106,7 @@ describe("runAssignment", () => {
       config,
       sessionFactory: async () => session.value,
       emit: (event) => events.push(event),
+      writeScreenshot,
       now: clock(),
     });
 
@@ -120,7 +122,16 @@ describe("runAssignment", () => {
       "step.captured",
       "session.closed",
     ]);
+    expect(writeScreenshot).toHaveBeenCalledWith({
+      runId: "run-1",
+      assignmentId: "assignment-1",
+      index: 0,
+      body: Uint8Array.from([1, 2, 3]),
+    });
+    const captured = events.find((event) => event.type === "step.captured");
+    expect(captured).toMatchObject({ screenshotId: "screenshot-1" });
     expect(result.steps[0]?.action).toEqual(action);
+    expect(result.steps[0]?.snapshot.screenshot).toEqual(Uint8Array.from([1, 2, 3]));
     expect(session.close).toHaveBeenCalledOnce();
   });
 

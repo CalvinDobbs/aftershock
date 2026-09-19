@@ -13,6 +13,7 @@ import type {
 
 import { InMemoryEventRepository, RunEventStream } from "./event-stream.js";
 import { createObservabilityServer } from "./observability-api.js";
+import type { ScreenshotRepository } from "./screenshot-repository.js";
 
 function event(runId: string, assignmentId: string): AgentEvent {
   return {
@@ -46,12 +47,18 @@ const replayService: SessionReplayService = {
   listDownloads: async () => downloads,
 };
 
+const storedScreenshot = Uint8Array.from([137, 80, 78, 71]);
+const screenshotRepository: ScreenshotRepository = {
+  put: async () => "a".repeat(64),
+  get: async (id) => (id === "a".repeat(64) ? storedScreenshot : undefined),
+};
+
 let server: Server;
 let base: string;
 const stream = new RunEventStream(new InMemoryEventRepository());
 
 beforeAll(async () => {
-  server = createObservabilityServer({ eventStream: stream, replayService });
+  server = createObservabilityServer({ eventStream: stream, replayService, screenshotRepository });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -124,6 +131,22 @@ describe("observability api", () => {
     const listed = await fetch(`${base}/api/sessions/session-1/recording-downloads`);
     expect(listed.status).toBe(200);
     expect(await listed.json()).toEqual({ downloads });
+  });
+
+  it("serves stored screenshot bytes with immutable caching", async () => {
+    const response = await fetch(`${base}/api/evidence/screenshots/${"a".repeat(64)}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe(
+      "private, max-age=31536000, immutable",
+    );
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(storedScreenshot);
+  });
+
+  it("returns 404 for a missing screenshot", async () => {
+    const response = await fetch(`${base}/api/evidence/screenshots/${"b".repeat(64)}`);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not found" });
   });
 
   it("returns 404 for unmatched routes", async () => {
