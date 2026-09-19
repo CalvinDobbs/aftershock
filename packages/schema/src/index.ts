@@ -10,8 +10,8 @@ export const AssignmentArchetypeSchema = z.enum([
 export const ActionSchema = z.object({
   selector: z.string(),
   description: z.string(),
-  method: z.string().nullable(),
-  arguments: z.array(z.string()),
+  method: z.string().optional(),
+  arguments: z.array(z.string()).optional(),
 });
 
 export const JourneyStepSchema = z.object({
@@ -96,6 +96,14 @@ const EventEnvelopeSchema = z.object({
   timestamp: z.string().datetime(),
 });
 
+const InferenceUsageSchema = z.object({
+  inputTokens: z.number().nonnegative(),
+  outputTokens: z.number().nonnegative(),
+  reasoningTokens: z.number().nonnegative(),
+  cachedInputTokens: z.number().nonnegative(),
+  inferenceTimeMs: z.number().nonnegative(),
+});
+
 export const AgentEventSchema = z.discriminatedUnion("type", [
   EventEnvelopeSchema.extend({
     type: z.literal("session.opened"),
@@ -108,13 +116,17 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     index: z.number().int().nonnegative(),
     instruction: z.string(),
     action: ActionSchema,
+    actionId: z.string().optional(),
     cacheStatus: z.string(),
+    usage: InferenceUsageSchema,
     durationMs: z.number().nonnegative(),
   }),
   EventEnvelopeSchema.extend({
     type: z.literal("step.executed"),
     index: z.number().int().nonnegative(),
     action: ActionSchema,
+    actionId: z.string().optional(),
+    usage: InferenceUsageSchema,
     durationMs: z.number().nonnegative(),
   }),
   EventEnvelopeSchema.extend({
@@ -145,5 +157,7 @@ export type AgentEvent = z.infer<typeof AgentEventSchema>;
 export type Assignment = z.infer<typeof AssignmentSchema>;
 export type AssignmentResult = z.infer<typeof AssignmentResultSchema>;
 export type AssignmentStepResult = z.infer<typeof AssignmentStepResultSchema>;
+export type ConsoleEntry = z.infer<typeof ConsoleEntrySchema>;
+export type NetworkSummary = z.infer<typeof NetworkSummarySchema>;
 export type RawFinding = z.infer<typeof RawFindingSchema>;
 export type StepSnapshot = z.infer<typeof StepSnapshotSchema>;
