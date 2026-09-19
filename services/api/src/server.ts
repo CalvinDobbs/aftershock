@@ -2,7 +2,9 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { loadProjects, projectFor, type Projects } from "./projects.js";
-import { InMemoryRunStore, toSummary, type RunStore } from "./runs.js";
+import type { RunDetail, RunSummary } from "@aftershock/schema";
+
+import { InMemoryRunStore, toSummary, type RunRecord, type RunStore } from "./runs.js";
 import { handleWebhook, verifySignature } from "./webhook.js";
 
 /** All a URL resolver needs: which commit, on which branch, in which repo. */
@@ -124,15 +126,92 @@ export function createServer(options: ServerOptions = {}): FastifyInstance {
   }
 
   // --- the run API the dashboard reads ------------------------------------
+  //
+  // The Director owns the pipeline vocabulary — charter, findings, repair —
+  // and keeps a durable journal of every run it has driven. This service owns
+  // the trigger and the registry, and knows about runs the Director has not
+  // seen yet: a push whose preview has not deployed. So the dashboard reads
+  // from here, and this service composes the two: the Director's detail when
+  // there is one, a pending record when there is not, always under this
+  // service's run id so a link the dashboard renders resolves back here.
 
-  app.get("/runs", async () => (await store.list()).map(toSummary));
+  /** Fetches JSON from the Director, or null on any failure. Never throws. */
+  async function fromDirector<T>(path: string): Promise<T | null> {
+    const response = await fetchImpl(`${orchestratorUrl}${path}`, {
+      headers: { accept: "application/json" },
+    }).catch(() => null);
+    if (!response?.ok) return null;
+    return (await response.json().catch(() => null)) as T | null;
+  }
+
+  /**
+   * A run the Director has not started yet, in the shape the dashboard reads.
+   * Honest about what is unknown: no charter, no agents, no findings, and a
+   * commit whose message and author arrive only once Scout has read it.
+   */
+  function pendingDetail(run: RunRecord): RunDetail {
+    return {
+      run: {
+        id: run.runId,
+        repo: run.repo,
+        commit: {
+          sha: run.sha,
+          message: "",
+          author: "",
+          branch: run.ref.replace(/^refs\/heads\//, ""),
+          ...(run.prNumber !== undefined ? { prNumber: run.prNumber } : {}),
+          filesChanged: 0,
+          additions: 0,
+          deletions: 0,
+        },
+        previewUrl: run.previewUrl,
+        baseUrl: run.baseUrl,
+        baseBranch: run.baseRef,
+        status: run.status,
+        riskScore: 0,
+        startedAt: run.startedAt ?? run.createdAt,
+        finishedAt: run.finishedAt,
+        stages: [],
+      },
+      charter: null,
+      assignments: [],
+      findings: [],
+      issues: [],
+      diagnosis: null,
+      patch: null,
+      verification: null,
+      pullRequest: null,
+    };
+  }
+
+  app.get("/runs", async () => {
+    const records = await store.list();
+    // Validated before use: an unexpected shape from the Director must degrade
+    // to our own summaries, not 500 the dashboard's run list.
+    const upstream = await fromDirector<unknown>("/runs");
+    const directorSummaries = Array.isArray(upstream) ? (upstream as RunSummary[]) : [];
+    const byDirectorId = new Map(directorSummaries.map((s) => [s.id, s]));
+
+    return records.map((record) => {
+      const rich = record.orchestratorRunId ? byDirectorId.get(record.orchestratorRunId) : undefined;
+      // The Director's summary knows the commit message, the author, the agent
+      // and finding counts, and whether the fix verified. Ours knows only that
+      // a push happened. Prefer the richer one, but under our id, so the link
+      // the dashboard renders resolves back to this service.
+      return rich ? { ...rich, id: record.runId } : toSummary(record);
+    });
+  });
 
   app.get<{ Params: { id: string } }>("/runs/:id", async (request, reply) => {
     const run = await store.get(request.params.id);
     if (!run) return reply.code(404).send({ error: "run not found" });
-    // RunDetail is assembled by the Director, which owns the pipeline
-    // vocabulary. Until that bridge lands this serves the record it has.
-    return { run };
+
+    if (run.orchestratorRunId) {
+      const detail = await fromDirector<RunDetail>(`/runs/${encodeURIComponent(run.orchestratorRunId)}`);
+      // Same id rewrite as the list, for the same reason.
+      if (detail) return { ...detail, run: { ...detail.run, id: run.runId } };
+    }
+    return pendingDetail(run);
   });
 
   app.get<{ Params: { id: string } }>("/runs/:id/events", async (request, reply) => {

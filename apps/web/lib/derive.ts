@@ -37,7 +37,9 @@ export function preview(r: RunSummary): string {
   if (r.status === 'no_findings') return `nothing to report. ${r.findingsRaised} raised, all discarded`;
   if (r.prNumber && r.verified) return `#${r.prNumber} opened, the re-run came back green`;
   if (r.prNumber) return `#${r.prNumber} opened as a draft — the fix is not proven`;
-  return `${r.findingsConfirmed} filed of ${r.findingsRaised} raised`;
+  // "confirmed", not "filed": the summary knows what cleared the gates, not
+  // what reached GitHub. Filing is a write, and this line must not claim one.
+  return `${r.findingsConfirmed} confirmed of ${r.findingsRaised} raised`;
 }
 
 export const stageBot = (s: Stage): BotId => BOT_BY_STAGE[s];

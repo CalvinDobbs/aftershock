@@ -118,7 +118,7 @@ export type DiffReader = (workingDirectory: string) => Promise<string>;
 export const gitDiff: DiffReader = async (workingDirectory) => {
   const { stdout } = await run(
     "git",
-    ["-c", "core.pager=cat", "-c", "diff.external=", "diff", "--no-color", "--"],
+    ["-c", "core.pager=cat", "--no-ext-diff", "diff", "--no-color", "--"],
     { cwd: workingDirectory, maxBuffer: 32 * 1024 * 1024 },
   );
   return stdout;

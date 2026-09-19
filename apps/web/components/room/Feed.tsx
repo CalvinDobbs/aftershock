@@ -6,7 +6,7 @@ import type { Step } from '@aftershock/schema';
 import { PageShot } from '@/components/ui/PageShot';
 import { Spinner } from '@/components/ui/atoms';
 
-export type FeedState = 'queued' | 'running' | 'passed' | 'failed' | 'errored';
+export type FeedState = 'queued' | 'running' | 'passed' | 'failed' | 'errored' | 'skipped';
 
 /**
  * One browser, in the thread.
@@ -103,7 +103,9 @@ export function Feed({
   }, [state, sessionId]);
 
   const flagged = state === 'failed' || state === 'errored';
-  const pending = state === 'queued';
+  // Queued and skipped both dim: one has not run, the other ran and was
+  // never graded. The caption tells them apart; the frame should not pretend.
+  const pending = state === 'queued' || state === 'skipped';
 
   return (
     <figure className="m-0 min-w-0">

@@ -53,7 +53,7 @@ export type FeedItem = {
   assignmentId: string;
   bot: BotId;
   sessionId: string | null;
-  state: 'queued' | 'running' | 'passed' | 'failed' | 'errored';
+  state: 'queued' | 'running' | 'passed' | 'failed' | 'errored' | 'skipped';
   label: string;
   caption: string;
   step?: Step;
@@ -128,8 +128,15 @@ function evidencePair(a: Assignment): { before?: Step; after?: Step } {
 /** The one value this step's assertion is about, whatever the app calls it. */
 const valueOf = (s?: Step) => s?.digest?.primary?.value;
 
-/** PLACEHOLDER — read out of the agent's step label; see expectedLabel note. */
-const expectedOf = (s?: Step) => s?.label.match(/expected\s+([^)]+?)\)?\s*$/i)?.[1]?.trim();
+/**
+ * What the assertion said should have happened.
+ *
+ * The Critic's Finding carries this as `expected`, sourced from the charter.
+ * The step-label parse is only a fallback for an assignment that failed
+ * before any finding was written about it.
+ */
+const expectedOf = (s: Step | undefined, finding?: Finding) =>
+  finding?.expected || s?.label.match(/expected\s+([^)]+?)\)?\s*$/i)?.[1]?.trim();
 
 /** Pick a presence verb deterministically, so it never changes on re-render. */
 function verbFor(bot: BotId, salt: string): string {
@@ -230,10 +237,15 @@ export function deriveRoom(s: RunState): RoomEntry[] {
                 ? 'errored'
                 : a.status === 'passed'
                   ? 'passed'
-                  : 'queued';
+                  : a.status === 'skipped'
+                    ? 'skipped'
+                    : 'queued';
         const caption = {
           running: a.steps.at(-1)?.label ?? 'opening the page',
           queued: 'waiting for a slot',
+          // Captured but never graded — a coverage gap, not a browser that is
+          // still waiting. Rendering it as queued hid the gap.
+          skipped: 'ran, not graded',
           failed: 'found something',
           errored: 'session died',
           passed: 'clean',
@@ -248,6 +260,8 @@ export function deriveRoom(s: RunState): RoomEntry[] {
               ? `${a.assertionId} · step ${a.steps.length}`
               : state === 'queued'
                 ? `${a.assertionId} · queued`
+                : state === 'skipped'
+                  ? `${a.assertionId} · skipped`
                 : `${a.assertionId} · ${a.steps.length} steps`,
           caption,
           step: after,
@@ -291,7 +305,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
         label: after?.digest?.primary?.label ?? 'value',
         before: valueOf(before)!,
         after: valueOf(after)!,
-        ...(expectedOf(after) ? { expected: expectedOf(after) } : {}),
+        ...(expectedOf(after, finding) ? { expected: expectedOf(after, finding) } : {}),
       });
     }
 

@@ -486,9 +486,34 @@ export function findingsFrom(deltas: readonly SnapshotDelta[]): RawFinding[] {
       d.preview === "—" &&
       !isCorruptValue(d.base));
 
+  /**
+   * One broken formatter, one finding.
+   *
+   * When every amount on a page renders as $NaN, pairing produces one change
+   * per amount — $84.00 → $NaN, $28.00 → $NaN, $112.00 → $NaN — each with its
+   * own field name and so its own cluster. Filed, that is three issues for one
+   * bug, and at the three-issue cap they pushed a genuinely separate finding
+   * off the list. Rendered values that became the same corrupt value are one
+   * behaviour wherever they appear; the fields they took out are its evidence.
+   *
+   * Only rendered channels: a console line that mentions NaN is a symptom
+   * being reported, not a value being displayed, and stays its own finding.
+   */
+  const corruptToken = (text: string) => text.match(CORRUPT_VALUE)?.[0] ?? null;
+  const absorbed = new Set<SnapshotDelta>();
+  for (const d of deltas) {
+    if (d.classification !== "unclaimed" || downstream(d)) continue;
+    if (d.channel !== "tree" && d.channel !== "text") continue;
+    const token = corruptToken(d.preview);
+    if (!token || isCorruptValue(d.base) || d.base === "—") continue;
+    const signature = `differential::corrupt-value::${token}`;
+    bySignature.set(signature, [...(bySignature.get(signature) ?? []), d]);
+    absorbed.add(d);
+  }
+
   for (const d of deltas) {
     if (d.classification !== "unclaimed") continue;
-    if (downstream(d)) continue;
+    if (downstream(d) || absorbed.has(d)) continue;
     const signature = `differential::${d.channel}::${normalise(d.field)}`;
     bySignature.set(signature, [...(bySignature.get(signature) ?? []), d]);
   }
@@ -500,7 +525,9 @@ export function findingsFrom(deltas: readonly SnapshotDelta[]): RawFinding[] {
       class: "unclaimed_delta" as const,
       severity: severityFor(first),
       signature,
-      summary: `${first.field} differs from base and nothing in the diff claimed it would: base ${first.base}, preview ${first.preview}`,
+      summary: signature.startsWith("differential::corrupt-value::")
+        ? corruptSummary(group)
+        : `${first.field} differs from base and nothing in the diff claimed it would: base ${first.base}, preview ${first.preview}`,
       stepIndex: first.stepIndex,
       evidence: [
         `channel: ${first.channel}`,
@@ -510,6 +537,17 @@ export function findingsFrom(deltas: readonly SnapshotDelta[]): RawFinding[] {
       ],
     } satisfies RawFinding;
   });
+}
+
+/** `StaticText: $84.00` → `$84.00`: the value a person read, without the role. */
+const shown = (line: string) => normalise(line).replace(/^[a-z]+:\s*/i, "").trim();
+
+/** One sentence for one broken formatter, naming everything it took out. */
+function corruptSummary(group: readonly SnapshotDelta[]): string {
+  const bases = [...new Set(group.map((d) => shown(d.base)))];
+  const value = shown(group[0]!.preview);
+  const subject = bases.length === 1 ? group[0]!.field : `${bases.length} values`;
+  return `${subject} render as ${value} where base shows ${bases.join(", ")}; nothing in the diff claimed this would change`;
 }
 
 export interface ComparisonOutcome {

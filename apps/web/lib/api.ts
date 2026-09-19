@@ -28,7 +28,9 @@ export async function listRuns(): Promise<RunSummary[]> {
     const live = await get<RunSummary[]>('/runs');
     if (live) return live;
   }
-  return golden.runList;
+  // One cached run, not a fabricated history. The other rows the fixture
+  // carries were placeholders that all deep-linked to this same run.
+  return golden.runList.filter((r) => r.id === golden.RUN_ID);
 }
 
 export async function getRunDetail(runId: string): Promise<RunDetail | null> {
@@ -36,13 +38,10 @@ export async function getRunDetail(runId: string): Promise<RunDetail | null> {
     const live = await get<RunDetail>(`/runs/${runId}`);
     if (live) return live;
   }
-  // PLACEHOLDER — every fixture row resolves to the same golden run so the
-  // dashboard is navigable before the backend exists. Delete this branch once
-  // `api` serves real runs; the golden run itself should then live in the
-  // database as the DEMO_MODE replay source, not in the bundle.
-  if (golden.runList.some((r) => r.id === runId)) {
-    return { ...golden.detail, run: { ...golden.detail.run, id: runId } };
-  }
+  // Without a backend the dashboard serves exactly one run: the golden run
+  // the PRD names as the DEMO_MODE fallback, so a dead network on stage costs
+  // nothing. Live runs come from services/api; this is not a stand-in for it.
+  if (runId === golden.RUN_ID) return golden.detail;
   return null;
 }
 

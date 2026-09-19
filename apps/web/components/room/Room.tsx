@@ -47,7 +47,13 @@ export function Room({
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
-      <Sidebar runs={runs} activeRunId={runId} roster={roster} runCostMs={runCostMs} />
+      <Sidebar
+        runs={runs}
+        activeRunId={runId}
+        roster={roster}
+        runCostMs={runCostMs}
+        author={run.commit.author}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col bg-stage">
         <RunHeader

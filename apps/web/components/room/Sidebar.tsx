@@ -43,11 +43,14 @@ export function Sidebar({
   activeRunId,
   roster,
   runCostMs,
+  author,
 }: {
   runs: RunSummary[];
   activeRunId: string;
   roster: Record<BotId, RosterStatus>;
   runCostMs: number;
+  /** Whoever pushed the commit under test. Empty until Scout has read it. */
+  author: string;
 }) {
   // Defaults render on the server; the stored preference is applied after
   // mount so the two passes agree.
@@ -231,17 +234,29 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* PLACEHOLDER — the signed-in user is hardcoded. Auth on our own
-          dashboard is explicitly out of scope in the PRD; swap this for the
-          GitHub App's installation user when there is a session to read. */}
+      {/* The room has no login — the PRD puts dashboard auth out of scope —
+          so the footer names the one person a run is actually about: whoever
+          pushed the commit. Real data from Scout, never a placeholder name. */}
       <div className="flex items-center gap-2.5 border-t border-edge px-4 py-3.5">
         <span className="flex size-7 items-center justify-center rounded-full bg-[#262626] text-[11.5px]/[1] font-medium text-ink-4">
-          MK
+          {initials(author)}
         </span>
-        <span className="text-[13.5px]/[1] text-ink-3">Maya Khan</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13.5px]/[1.25] text-ink-3">
+            {author || 'author not read yet'}
+          </span>
+          <span className="block text-[11px]/[1.3] text-ink-8">pushed this commit</span>
+        </span>
       </div>
     </aside>
   );
+}
+
+/** "maya" → "M", "Maya Khan" → "MK", "" → "?" */
+function initials(name: string): string {
+  const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts.slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
 }
 
 function Section({

@@ -13,12 +13,11 @@ import type {
 } from '@aftershock/schema';
 
 /**
- * PLACEHOLDER — the cached golden run (PRD > Demo safety).
+ * The cached golden run (PRD > Demo safety).
  *
- * This whole file goes away once `api` serves real runs. Keep the golden run
- * itself: it belongs in the database as the DEMO_MODE replay source so a dead
- * network on stage costs nothing. Until then it is the contract by example —
- * if the backend produces this shape, the room renders.
+ * Served only when AFTERSHOCK_API_URL is unset. It is the DEMO_MODE replay
+ * source the PRD asks for — a dead network on stage costs nothing — and a
+ * contract by example: services/api produces this shape for live runs.
  *
  * This is the replay source the dashboard falls back to when NEXT_PUBLIC_API_URL
  * is unset, and the thing DEMO_MODE replays if the network dies on stage. It is
@@ -35,13 +34,9 @@ const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 export const RUN_ID = 'run_8f2a';
 
 /**
- * PLACEHOLDER — real Browserbase recordings, wrong journey.
- *
- * These are live session IDs captured against a storefront, so the feeds in
- * the room play actual video through the replay proxy rather than showing a
- * dead frame. They are not recordings of *this* commit's journeys. Replace
- * each with the session the orchestrator actually opened once runs are real;
- * the ids are the only thing that has to change.
+ * Real Browserbase recordings, so the fallback plays video through the replay
+ * proxy rather than a dead frame. They are storefront sessions, not recordings
+ * of this fixture's journeys; live runs carry their own session ids.
  */
 const SESSION = {
   A1: 'eaf251fe-b4f8-40dd-a332-95e63c498ab2',

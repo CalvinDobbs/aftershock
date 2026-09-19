@@ -395,6 +395,35 @@ describe("platform chrome", () => {
 });
 
 describe("a broken formatter is one finding", () => {
+  it("collapses every amount that became the same corrupt value into one finding", async () => {
+    // Live against the demo storefront: three prices each paired to a $NaN,
+    // three clusters, three GitHub issues for one bug — and at the cap they
+    // pushed the coupon finding off the list.
+    const { findingsFrom } = await import("./comparator.js");
+    const change = (base: string) => ({
+      stepIndex: 3, channel: "tree" as const, field: `StaticText "${base}"`,
+      base: `StaticText: ${base}`, preview: "StaticText: $NaN",
+      classification: "unclaimed" as const, reason: "r",
+    });
+    const findings = findingsFrom([change("$84.00"), change("$28.00"), change("$112.00")]);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.severity).toBe("critical");
+    expect(findings[0]!.signature).toBe("differential::corrupt-value::NaN");
+    expect(findings[0]!.summary).toContain("3 values");
+    expect(findings[0]!.summary).toContain("$84.00");
+    expect(findings[0]!.summary).toContain("$112.00");
+  });
+
+  it("keeps a separate genuine finding on another step separate", async () => {
+    const { findingsFrom } = await import("./comparator.js");
+    const findings = findingsFrom([
+      { stepIndex: 3, channel: "tree", field: 'StaticText "$84.00"', base: "StaticText: $84.00", preview: "StaticText: $NaN", classification: "unclaimed", reason: "r" },
+      { stepIndex: 5, channel: "tree", field: 'text "Total"', base: "$84.00", preview: "$84.00 (coupon applied)", classification: "unclaimed", reason: "r" },
+    ]);
+    expect(findings).toHaveLength(2);
+  });
+
   it("reports the corrupt value, not every value it took out", async () => {
     // A real run against the demo storefront reported six findings for one
     // bug: $NaN appearing, and $84.00 / $28.00 / $112.00 vanishing because

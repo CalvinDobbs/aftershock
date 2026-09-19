@@ -194,6 +194,83 @@ describe("project configuration", () => {
   });
 });
 
+describe("composing the Director's detail under this service's ids", () => {
+  const detail = {
+    run: { id: "orch-1", repo: "o/r", commit: { sha: "a3f9c21", message: "feat: coupons", author: "maya", branch: "feat/coupon-codes", filesChanged: 6, additions: 1, deletions: 1 },
+      previewUrl: "https://preview.test", baseUrl: "https://base.test", baseBranch: "main", status: "complete",
+      riskScore: 0.7, startedAt: "2026-09-19T14:00:00.000Z", finishedAt: "2026-09-19T14:03:00.000Z", stages: [] },
+    charter: null, assignments: [], findings: [], issues: [], diagnosis: null, patch: null,
+    verification: { patchId: "p", rows: [], checklist: [], regressionSuitePassed: true, passed: true }, pullRequest: null,
+  };
+  const summary = { id: "orch-1", repo: "o/r", sha: "a3f9c21", message: "feat: coupons", branch: "feat/coupon-codes",
+    author: "maya", status: "complete", agentCount: 4, findingsConfirmed: 2, findingsRaised: 4, durationMs: 180000,
+    startedAt: "2026-09-19T14:00:00.000Z", prNumber: 145, verified: true };
+
+  function withDirector() {
+    const impl = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.endsWith("/api/runs/from-commit")) {
+        dispatched.push({ url: u, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+        return new Response(JSON.stringify({ run: { runId: "orch-1" } }), { status: 202 });
+      }
+      if (u.endsWith("/runs")) return new Response(JSON.stringify([summary]), { status: 200 });
+      if (u.endsWith("/runs/orch-1")) return new Response(JSON.stringify(detail), { status: 200 });
+      return new Response("not found", { status: 404 });
+    });
+    return createServer({ store, webhookSecret: SECRET, fetchImpl: impl as unknown as typeof fetch,
+      resolvePreview: async () => "https://preview.test" });
+  }
+
+  it("serves the Director's RunDetail for a dispatched run, under our id", async () => {
+    const srv = withDirector();
+    const body = JSON.stringify(PUSH);
+    await srv.inject({ method: "POST", url: "/webhooks/github",
+      headers: { "content-type": "application/json", "x-github-event": "push", "x-hub-signature-256": sign(body) }, payload: body });
+    await vi.waitFor(async () => expect((await store.list())[0]!.orchestratorRunId).toBe("orch-1"));
+
+    const ours = (await store.list())[0]!.runId;
+    const response = await srv.inject({ method: "GET", url: `/runs/${ours}` });
+    expect(response.statusCode).toBe(200);
+    const got = response.json();
+    // The pipeline vocabulary is the Director's; the id the dashboard links by is ours.
+    expect(got.verification.passed).toBe(true);
+    expect(got.run.commit.author).toBe("maya");
+    expect(got.run.id).toBe(ours);
+    await srv.close();
+  });
+
+  it("lists the Director's richer summary, still under our id", async () => {
+    const srv = withDirector();
+    const body = JSON.stringify(PUSH);
+    await srv.inject({ method: "POST", url: "/webhooks/github",
+      headers: { "content-type": "application/json", "x-github-event": "push", "x-hub-signature-256": sign(body) }, payload: body });
+    await vi.waitFor(async () => expect((await store.list())[0]!.orchestratorRunId).toBe("orch-1"));
+
+    const list = (await srv.inject({ method: "GET", url: "/runs" })).json();
+    expect(list[0]).toMatchObject({ id: (await store.list())[0]!.runId, author: "maya", agentCount: 4, verified: true });
+    await srv.close();
+  });
+
+  it("serves an honest pending detail before the Director has the run", async () => {
+    // A push whose preview has not deployed exists only here. The dashboard
+    // must still be able to open it, and nothing about it should be invented.
+    const quiet = createServer({ store, webhookSecret: SECRET,
+      fetchImpl: (async () => new Response("down", { status: 503 })) as unknown as typeof fetch,
+      resolvePreview: async () => null });
+    const body = JSON.stringify(PUSH);
+    await quiet.inject({ method: "POST", url: "/webhooks/github",
+      headers: { "content-type": "application/json", "x-github-event": "push", "x-hub-signature-256": sign(body) }, payload: body });
+    const ours = (await store.list())[0]!.runId;
+
+    const got = (await quiet.inject({ method: "GET", url: `/runs/${ours}` })).json();
+    expect(got.run.status).toBe("pending");
+    expect(got.charter).toBeNull();
+    expect(got.assignments).toEqual([]);
+    expect(got.run.commit.author).toBe("");
+    await quiet.close();
+  });
+});
+
 describe("the run API the dashboard reads", () => {
   it("lists runs in the summary shape", async () => {
     await hook("push", PUSH);
