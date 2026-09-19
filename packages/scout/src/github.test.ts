@@ -85,3 +85,160 @@ describe("renderDiff", () => {
     ).toContain("[no textual patch]");
   });
 });
+
+function writeFetch(routes: Record<string, unknown>) {
+  const calls: { method: string; path: string; body: unknown }[] = [];
+  const impl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname;
+    const method = init?.method ?? "GET";
+    calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    const body = routes[`${method} ${path}`] ?? routes[path];
+    if (body === undefined) return new Response("no route", { status: 404 });
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  return { impl, calls };
+}
+
+describe("GitHubClient writes", () => {
+  it("refuses to write without a token rather than sending an anonymous request", async () => {
+    const { impl, calls } = writeFetch({});
+    const client = new GitHubClient({ fetchImpl: impl });
+    await expect(
+      client.createIssue({ repo: "o/r", title: "t", body: "b" }),
+    ).rejects.toThrow(/never anonymous/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("files an issue and returns its number and url", async () => {
+    const { impl, calls } = writeFetch({
+      "POST /repos/o/r/issues": { number: 143, html_url: "https://github.com/o/r/issues/143" },
+    });
+    const client = new GitHubClient({ token: "t", fetchImpl: impl });
+    const issue = await client.createIssue({
+      repo: "o/r",
+      title: "Checkout total does not update",
+      body: "...",
+      labels: ["aftershock", "bug"],
+    });
+    expect(issue.number).toBe(143);
+    expect(issue.html_url).toContain("/issues/143");
+    expect(calls[0]!.body).toMatchObject({ labels: ["aftershock", "bug"] });
+  });
+
+  it("carries GitHub's own reason into the error", async () => {
+    const impl = vi.fn(
+      async () => new Response("Reference already exists", { status: 422 }),
+    ) as unknown as typeof fetch;
+    await expect(
+      new GitHubClient({ token: "t", fetchImpl: impl }).createIssue({ repo: "o/r", title: "t", body: "b" }),
+    ).rejects.toThrow(/Reference already exists/);
+  });
+
+  it("commits every file as one commit, not one commit per file", async () => {
+    const { impl, calls } = writeFetch({
+      "GET /repos/o/r/git/ref/heads/aftershock%2Ffix-143": { object: { sha: "parentsha" } },
+      "GET /repos/o/r/git/commits/parentsha": { tree: { sha: "treesha" } },
+      "POST /repos/o/r/git/trees": { sha: "newtree" },
+      "POST /repos/o/r/git/commits": { sha: "newcommit" },
+      "PATCH /repos/o/r/git/refs/heads/aftershock%2Ffix-143": {},
+    });
+    const client = new GitHubClient({ token: "t", fetchImpl: impl });
+    const sha = await client.commitFiles({
+      repo: "o/r",
+      branch: "aftershock/fix-143",
+      message: "fix: recompute cart total",
+      files: [
+        { path: "hooks/useCartTotal.ts", content: "a" },
+        { path: "components/CouponInput.tsx", content: "b" },
+      ],
+    });
+
+    expect(sha).toBe("newcommit");
+    const commits = calls.filter((c) => c.path === "/repos/o/r/git/commits" && c.method === "POST");
+    expect(commits).toHaveLength(1);
+    const tree = calls.find((c) => c.path === "/repos/o/r/git/trees")!;
+    expect((tree.body as { tree: unknown[] }).tree).toHaveLength(2);
+    expect(tree.body).toMatchObject({ base_tree: "treesha" });
+  });
+
+  it("refuses an empty commit", async () => {
+    const { impl } = writeFetch({});
+    await expect(
+      new GitHubClient({ token: "t", fetchImpl: impl }).commitFiles({
+        repo: "o/r",
+        branch: "b",
+        message: "m",
+        files: [],
+      }),
+    ).rejects.toThrow(/at least one file/);
+  });
+
+  it("labels a pull request in a second call, because the create endpoint drops them", async () => {
+    const { impl, calls } = writeFetch({
+      "POST /repos/o/r/pulls": { number: 145, html_url: "https://github.com/o/r/pull/145" },
+      "POST /repos/o/r/issues/145/labels": {},
+    });
+    const client = new GitHubClient({ token: "t", fetchImpl: impl });
+    const pr = await client.openPullRequest({
+      repo: "o/r",
+      head: "aftershock/fix-143",
+      base: "main",
+      title: "fix: recompute cart total",
+      body: "...",
+      labels: ["aftershock", "aftershock:unverified"],
+      draft: true,
+    });
+
+    expect(pr.number).toBe(145);
+    expect(calls[0]!.body).toMatchObject({ draft: true });
+    const labelled = calls.find((c) => c.path === "/repos/o/r/issues/145/labels")!;
+    expect(labelled.body).toMatchObject({ labels: ["aftershock", "aftershock:unverified"] });
+  });
+
+  it("truncates a long commit status description to what GitHub accepts", async () => {
+    const { impl, calls } = writeFetch({ "POST /repos/o/r/statuses/abc": {} });
+    await new GitHubClient({ token: "t", fetchImpl: impl }).setCommitStatus({
+      repo: "o/r",
+      sha: "abc",
+      state: "success",
+      description: "x".repeat(400),
+    });
+    expect((calls[0]!.body as { description: string }).description).toHaveLength(140);
+  });
+});
+
+describe("createBranch", () => {
+  it("branches from a sha without looking anything up", async () => {
+    const { impl, calls } = writeFetch({ "POST /repos/o/r/git/refs": {} });
+    await new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({
+      repo: "o/r",
+      name: "aftershock/fix-143",
+      sha: "abc1234",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toMatchObject({ ref: "refs/heads/aftershock/fix-143", sha: "abc1234" });
+  });
+
+  it("resolves a branch head when given one instead", async () => {
+    const { impl, calls } = writeFetch({
+      "GET /repos/o/r/git/ref/heads/main": { object: { sha: "mainsha" } },
+      "POST /repos/o/r/git/refs": {},
+    });
+    await new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({
+      repo: "o/r",
+      name: "hotfix",
+      from: "main",
+    });
+    expect(calls[1]!.body).toMatchObject({ sha: "mainsha" });
+  });
+
+  it("refuses when given neither", async () => {
+    const { impl } = writeFetch({});
+    await expect(
+      new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({ repo: "o/r", name: "x" }),
+    ).rejects.toThrow(/either a sha or a branch/);
+  });
+});

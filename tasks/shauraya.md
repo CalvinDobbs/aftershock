@@ -38,9 +38,29 @@ judge(input: { runId, charter, conformance, differential }): Promise<Finding[]>
 authorIssue(finding: Finding): Promise<IssueDraft> // unpublished; Director adds GitHub number/url
 
 // Calvin builds these.
-diagnose(input: { issue, intent, hypothesesLimit? }): Promise<Diagnosis>
-writePatch(input: { issue, diagnosis, intent, attempt, resumeThreadId? }): Promise<Patch>
-verify(input: { patch, issue, failedAssignments, baseUrl }): Promise<Verification>
+// Built, on branch calvin/repair-chain. Every stage takes (input, deps):
+// deps is how the model and the browser stack get injected, and how the
+// tests avoid needing either.
+
+diagnose(input: { issue, intent, route?, evidence?, hypothesesLimit? },
+         deps:  { model }): Promise<Diagnosis>
+
+// One call drives the whole repair chain, including the PRD's retry policy.
+// This is the one the stage machine wants.
+repair(input: { issue, diagnosis, intent, workingDirectory, runId, maxAttempts? },
+       deps:  { codex, verify, readDiff? }): Promise<RepairOutcome>
+
+// Pushes the branch and opens the PR — draft and labelled unverified when
+// repair() could not verify it. Returns { pullRequest: null, reason } when no
+// attempt produced a diff, so an empty PR is never opened.
+publishPatch(input: { outcome, issue, repo, baseBranch, headSha, workingDirectory, runId },
+             deps:  { github, readFiles? }): Promise<{ pullRequest, commitSha } | { pullRequest: null, reason }>
+
+// Underneath repair(), if a stage ever needs them on their own:
+writePatch(input: { ...repair's, attempt, resumeThreadId?, previousFailure? },
+           deps:  { codex, readDiff? }): Promise<Patch>
+verify(input: { patch, issue, failed, fixUrl, baseUrl, route, runId, regressionSuite? },
+       deps:  { runAssignment, runDifferential, screenshotUrlFor? }): Promise<Verification>
 ```
 
 Your `services/api` converges every trigger on one `createRun()`, which hands

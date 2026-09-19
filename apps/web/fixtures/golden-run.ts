@@ -710,6 +710,7 @@ export const runList: RunSummary[] = [
     durationMs: 214_000,
     startedAt: at(0),
     prNumber: 145,
+    verified: true,
   },
   {
     id: 'run_7b19',
@@ -725,6 +726,7 @@ export const runList: RunSummary[] = [
     durationMs: 121_000,
     startedAt: new Date(T0 - 5_400_000).toISOString(),
     prNumber: null,
+    verified: false,
   },
   {
     id: 'run_6e05',
@@ -740,6 +742,7 @@ export const runList: RunSummary[] = [
     durationMs: 198_000,
     startedAt: new Date(T0 - 14_400_000).toISOString(),
     prNumber: 139,
+    verified: false,
   },
   {
     id: 'run_5a93',
@@ -755,6 +758,7 @@ export const runList: RunSummary[] = [
     durationMs: 47_000,
     startedAt: new Date(T0 - 25_200_000).toISOString(),
     prNumber: null,
+    verified: false,
   },
   {
     id: 'run_4c71',
@@ -770,5 +774,6 @@ export const runList: RunSummary[] = [
     durationMs: 233_000,
     startedAt: new Date(T0 - 39_600_000).toISOString(),
     prNumber: 131,
+    verified: false,
   },
 ];

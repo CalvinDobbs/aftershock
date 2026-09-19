@@ -1,5 +1,5 @@
 {
-  "name": "@aftershock/api",
+  "name": "@aftershock/sleuth",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,21 +10,14 @@
     }
   },
   "scripts": {
-    "dev": "node --env-file=../../.env --import tsx src/start.ts",
-    "start": "node --import tsx src/start.ts",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@aftershock/schema": "workspace:*",
-    "fastify": "^5.2.0",
+    "@aftershock/scout": "workspace:*",
     "zod": "~4.4.3"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.5",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
   }
 }

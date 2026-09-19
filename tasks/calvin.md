@@ -7,6 +7,12 @@ and it sits in a file nobody else is touching.
 
 Board: <https://claude.ai/artifact/TkyxdAg4wZjtuFHKvgbVwe> · Spec: [prd.md](../prd.md) stages 4–6
 
+> **Status: all four built on `calvin/repair-chain`.** 86 new tests across the
+> three new packages plus the GitHub write path. What is *not* done is a live
+> run: no stage has met a real Codex process, a real browser or a real repo,
+> because each one is reached through an injected dependency that the tests
+> substitute. The wiring in `commit-run.ts` is Anirudh's.
+
 ---
 
 ## What you own
@@ -38,9 +44,29 @@ judge(input: { runId, charter, conformance, differential }): Promise<Finding[]>
 authorIssue(finding: Finding): Promise<IssueDraft> // unpublished; Director adds GitHub number/url
 
 // You build these. Anirudh calls them from the stage machine.
-diagnose(input: { issue, intent, hypothesesLimit? }): Promise<Diagnosis>
-writePatch(input: { issue, diagnosis, intent, attempt, resumeThreadId? }): Promise<Patch>
-verify(input: { patch, issue, failedAssignments, baseUrl }): Promise<Verification>
+// Built, on branch calvin/repair-chain. Every stage takes (input, deps):
+// deps is how the model and the browser stack get injected, and how the
+// tests avoid needing either.
+
+diagnose(input: { issue, intent, route?, evidence?, hypothesesLimit? },
+         deps:  { model }): Promise<Diagnosis>
+
+// One call drives the whole repair chain, including the PRD's retry policy.
+// This is the one the stage machine wants.
+repair(input: { issue, diagnosis, intent, workingDirectory, runId, maxAttempts? },
+       deps:  { codex, verify, readDiff? }): Promise<RepairOutcome>
+
+// Pushes the branch and opens the PR — draft and labelled unverified when
+// repair() could not verify it. Returns { pullRequest: null, reason } when no
+// attempt produced a diff, so an empty PR is never opened.
+publishPatch(input: { outcome, issue, repo, baseBranch, headSha, workingDirectory, runId },
+             deps:  { github, readFiles? }): Promise<{ pullRequest, commitSha } | { pullRequest: null, reason }>
+
+// Underneath repair(), if a stage ever needs them on their own:
+writePatch(input: { ...repair's, attempt, resumeThreadId?, previousFailure? },
+           deps:  { codex, readDiff? }): Promise<Patch>
+verify(input: { patch, issue, failed, fixUrl, baseUrl, route, runId, regressionSuite? },
+       deps:  { runAssignment, runDifferential, screenshotUrlFor? }): Promise<Verification>
 ```
 
 Export each from the package index. Anirudh wires them into `commit-run.ts` —

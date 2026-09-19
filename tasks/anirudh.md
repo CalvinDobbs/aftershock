@@ -402,3 +402,7 @@ confidence, Director wiring to Calvin's real filing/repair exports, then a full
 live run through Shauraya's room. Core Critic/comparator/events are tested;
 the full demo-to-repair loop is not complete. Local ignored artifacts and secrets
 are not included in Git; teammates must configure their own environment.
+
+### Final implementation pass
+
+Merged teammates main work; implementing conformance grading, import evidence, real repair wiring and the Director product API consumed by Shauraya. Final checks/live run pending.
