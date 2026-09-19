@@ -11,11 +11,13 @@ handoff source for the next agent; the original brief remains below.
 - [x] Fix the default canary journey and run it three times against Browserbase.
 - [x] Implement initial Critic clustering, confidence gates, reproduction, and issue authoring.
       Live differential verified; conformance evaluation/base-check integration remains below.
-- [ ] Emit pipeline events from the Director and expose an injectable event sink
+- [x] Emit pipeline events from the Director and expose an injectable event sink
       for Shauraya's API/persistence work.
 - [ ] Wire Calvin's repair functions once available; expose explicit integration
       seams meanwhile, without pretending an unavailable stage succeeded.
-- [ ] Run focused tests, `pnpm check`, and real demo tests; record commands/results.
+- [x] Run focused tests, `pnpm check`, and real demo tests; record commands/results.
+- [ ] Grade conformance assertions and connect real base checks to pre-existing rejection.
+- [ ] Resolve evidence-backed route confidence and rerun the two main demo bugs.
 
 Scope: comparator/canary, Critic, and Director. Leave sidebar, budget tuning,
 session reapers, web/API implementation, and repair packages to their owners.
@@ -60,8 +62,9 @@ state (CouponInput callback not connected), NOT a missing useMemo dependency.
 - Director integration emits Scout/Cast/Critic stage events through optional
   `emitPipelineEvent`. Runtime accepts `eventRepository`,
   `emitPipelineEvent(runId, event)`, and `onCommitRunComplete(runId, outcome)`.
-  Shauraya can wire these without editing runtime. Full run snapshots, cast
-  assignment projections, and repair stages are still pending.
+  Shauraya can wire these without editing runtime. Full run snapshots and cast
+  assignment projections are now implemented (see Director checkpoint below);
+  repair integration remains pending.
 - Integration tests and live differential reproduction passed. Full lane completion
   still requires conformance evaluation, the room bridge, filing, and repair wiring.
 
@@ -388,3 +391,14 @@ Unrelated untracked `Meridian prd.md` appeared during this session; it belongs
   cleanup. No main pushes, external issue filing, or demo repo changes.
 - Next implementation priorities: conformance evaluator and evidence-backed route
   mapping; dashboard persistence/SSE remains Shauraya's integration seam.
+
+
+### Handoff readiness
+
+Implementation commits `d57ee56` and `675c780` are on
+`codex/anirudh-critic-director`. Calvin and Shauraya can integrate the exported
+contracts now. Remaining Anirudh work: conformance/base grading, route-evidence
+confidence, Director wiring to Calvin's real filing/repair exports, then a full
+live run through Shauraya's room. Core Critic/comparator/events are tested;
+the full demo-to-repair loop is not complete. Local ignored artifacts and secrets
+are not included in Git; teammates must configure their own environment.
