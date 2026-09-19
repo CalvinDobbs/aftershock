@@ -2,7 +2,7 @@
 
 ## Working checklist and handoff
 
-**Latest status:** Anirudh implementation is ready for integration. All 441 tests
+**Latest status:** Anirudh implementation is ready for integration. All 341 tests
 and typechecks pass. Final live acceptance `run-1789850852902-0` confirms both main
 Meridian bugs and the real dashboard renders them. Live GitHub issue/repair/PR
 publication has NOT been exercised; it remains opt-in deployment configuration.
@@ -438,7 +438,7 @@ Merged teammates main work; implementing conformance grading, import evidence, r
 
 ### Verified
 
-- `pnpm check`: all typechecks, **441 tests** pass (70 orchestrator tests).
+- `pnpm check`: all typechecks, **341 tests** pass (70 orchestrator tests).
 - `AFTERSHOCK_EVIDENCE_ORIGIN=http://127.0.0.1:3003 node --env-file=.env --import tsx services/orchestrator/src/director-smoke.ts`
   passed for **run-1789850852902-0**. This uses the actual HTTP trigger, Git commit
   read, Scout model, remote Browserbase sessions, conformance grader, differential
