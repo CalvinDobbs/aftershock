@@ -1,16 +1,19 @@
 {
   "name": "@aftershock/schema",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./browser": {
+      "types": "./src/browser.ts",
+      "default": "./src/browser.ts"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"

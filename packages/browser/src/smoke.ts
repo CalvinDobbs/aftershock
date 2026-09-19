@@ -1,4 +1,4 @@
-import { AssignmentSchema } from "@aftershock/schema";
+import { AssignmentSchema } from "@aftershock/schema/browser";
 
 import { runAssignment } from "./harness.js";
 

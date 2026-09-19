@@ -1,6 +1,9 @@
 node_modules/
+.next/
 dist/
+out/
 coverage/
+.turbo/
 .env
 .env.*
 !.env.example

@@ -1,0 +1,14 @@
+{
+  "name": "@aftershock/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aftershock/schema": "workspace:*",
+    "zod": "~4.4.3"
+  }
+}

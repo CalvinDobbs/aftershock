@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AgentEvent, Assignment } from "@aftershock/schema";
+import type { AgentEvent, Assignment } from "@aftershock/schema/browser";
 
 import type { BrowserConfig } from "./config.js";
 import type { BrowserSession } from "./session.js";

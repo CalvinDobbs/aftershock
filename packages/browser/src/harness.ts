@@ -5,7 +5,7 @@ import {
   type AgentEvent,
   type Assignment,
   type AssignmentStepResult,
-} from "@aftershock/schema";
+} from "@aftershock/schema/browser";
 
 import { loadBrowserConfig, type BrowserConfig } from "./config.js";
 import { collectSessionEvidence } from "./evidence.js";

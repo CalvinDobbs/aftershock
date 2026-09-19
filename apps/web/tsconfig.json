@@ -1,13 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    // The Node packages are written under exactOptionalPropertyTypes; the
+    // dashboard is not, and it passes `x={maybeUndefined}` into optional props
+    // throughout. Relaxing it here keeps the flag where it earns its keep
+    // instead of rewriting render code to satisfy a compiler setting.
+    "exactOptionalPropertyTypes": false,
+    "jsx": "preserve",
+    "allowJs": true,
     "noEmit": true,
     "declaration": false,
     "declarationMap": false,
-    "types": ["vite/client"]
+    "incremental": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./*"] }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

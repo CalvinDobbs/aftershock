@@ -1,5 +1,5 @@
 import type { Browserbase } from "@browserbasehq/sdk";
-import type { ConsoleEntry, NetworkSummary } from "@aftershock/schema";
+import type { ConsoleEntry, NetworkSummary } from "@aftershock/schema/browser";
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};

@@ -1,5 +1,7 @@
 {
   "name": "aftershock",
+  "version": "0.1.0",
+  "description": "Autonomous QA and repair for every commit.",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.17.1",
@@ -10,7 +12,9 @@
     "build": "pnpm -r build",
     "check": "pnpm typecheck && pnpm test",
     "demo": "pnpm --parallel --filter @aftershock/orchestrator --filter @aftershock/web dev",
+    "dev": "pnpm --filter @aftershock/web dev",
     "dev:web": "pnpm --filter @aftershock/web dev",
+    "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r --parallel test:watch",
     "typecheck": "pnpm -r typecheck"
