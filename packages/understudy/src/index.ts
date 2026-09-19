@@ -23,6 +23,13 @@ export {
   type RepairOutcome,
 } from "./repair.js";
 export {
+  publishPatch,
+  verifiedBody,
+  type PatchGitHub,
+  type PublishDeps,
+  type PublishInput,
+} from "./publish.js";
+export {
   changedLineCount,
   changedPaths,
   violations,

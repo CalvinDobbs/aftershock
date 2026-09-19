@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Issue, Patch } from "@aftershock/schema";
 import type { Assignment, AssignmentResult, DifferentialResult } from "@aftershock/schema/browser";
 
-import { checklistAssignment, verificationLabels, verify, type VerifyDeps } from "./verify.js";
+import { checklistAssignment, verify, type VerifyDeps } from "./verify.js";
 
 const issue: Issue = {
   id: "issue-143",
@@ -183,31 +183,5 @@ describe("verify", () => {
     );
     expect(verification.rows[0]!.beforeScreenshotUrl).toBe("https://shots.example/before-sess.png");
     expect(verification.rows[0]!.afterScreenshotUrl).toBe("https://shots.example/after-sess.png");
-  });
-});
-
-describe("verificationLabels", () => {
-  it("marks a passing patch verified", () => {
-    expect(
-      verificationLabels({
-        patchId: "p",
-        rows: [],
-        checklist: [],
-        regressionSuitePassed: true,
-        passed: true,
-      }),
-    ).toContain("verified");
-  });
-
-  it("marks a failing patch unverified, so nothing reads as checked when it was not", () => {
-    const labels = verificationLabels({
-      patchId: "p",
-      rows: [],
-      checklist: [],
-      regressionSuitePassed: false,
-      passed: false,
-    });
-    expect(labels).toContain("aftershock:unverified");
-    expect(labels).not.toContain("verified");
   });
 });

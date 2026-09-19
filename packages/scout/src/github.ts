@@ -196,8 +196,25 @@ export class GitHubClient {
     return ref.object.sha;
   }
 
-  async createBranch(input: { repo: string; from: string; name: string }): Promise<string> {
-    const sha = await this.headSha({ repo: input.repo, branch: input.from });
+  /**
+   * Branch from a sha, or from another branch's head.
+   *
+   * Both exist because a fix branches from the commit under test — a sha the
+   * run already knows — while a hotfix branches from whatever `main` points at
+   * right now. Guessing which one a caller meant from the string's shape would
+   * misread a branch legitimately named after a sha.
+   */
+  async createBranch(input: {
+    repo: string;
+    name: string;
+    sha?: string;
+    from?: string;
+  }): Promise<string> {
+    const sha =
+      input.sha ??
+      (input.from ? await this.headSha({ repo: input.repo, branch: input.from }) : undefined);
+    if (!sha) throw new Error("createBranch needs either a sha or a branch to start from");
+
     await this.write(
       "POST",
       `/repos/${input.repo}/git/refs`,

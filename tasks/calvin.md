@@ -7,7 +7,7 @@ and it sits in a file nobody else is touching.
 
 Board: <https://claude.ai/artifact/TkyxdAg4wZjtuFHKvgbVwe> · Spec: [prd.md](../prd.md) stages 4–6
 
-> **Status: all four built on `calvin/repair-chain`.** 100 tests across the
+> **Status: all four built on `calvin/repair-chain`.** 86 new tests across the
 > three new packages plus the GitHub write path. What is *not* done is a live
 > run: no stage has met a real Codex process, a real browser or a real repo,
 > because each one is reached through an injected dependency that the tests
@@ -55,6 +55,12 @@ diagnose(input: { issue, intent, route?, evidence?, hypothesesLimit? },
 // This is the one the stage machine wants.
 repair(input: { issue, diagnosis, intent, workingDirectory, runId, maxAttempts? },
        deps:  { codex, verify, readDiff? }): Promise<RepairOutcome>
+
+// Pushes the branch and opens the PR — draft and labelled unverified when
+// repair() could not verify it. Returns { pullRequest: null, reason } when no
+// attempt produced a diff, so an empty PR is never opened.
+publishPatch(input: { outcome, issue, repo, baseBranch, headSha, workingDirectory, runId },
+             deps:  { github, readFiles? }): Promise<{ pullRequest, commitSha } | { pullRequest: null, reason }>
 
 // Underneath repair(), if a stage ever needs them on their own:
 writePatch(input: { ...repair's, attempt, resumeThreadId?, previousFailure? },

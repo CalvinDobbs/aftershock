@@ -176,18 +176,3 @@ export async function verify(input: VerifyInput, deps: VerifyDeps): Promise<Veri
       regressionSuitePassed,
   });
 }
-
-/**
- * What the PR should say about itself.
- *
- * The reviewer's first question is "does this actually work", so the answer
- * leads. An unverified patch says so in its labels and its body rather than
- * opening quietly and letting someone assume it was checked.
- */
-export function verificationLabels(verification: Verification): string[] {
-  return [
-    "aftershock",
-    "automated-fix",
-    verification.passed ? "verified" : "aftershock:unverified",
-  ];
-}

@@ -209,3 +209,36 @@ describe("GitHubClient writes", () => {
     expect((calls[0]!.body as { description: string }).description).toHaveLength(140);
   });
 });
+
+describe("createBranch", () => {
+  it("branches from a sha without looking anything up", async () => {
+    const { impl, calls } = writeFetch({ "POST /repos/o/r/git/refs": {} });
+    await new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({
+      repo: "o/r",
+      name: "aftershock/fix-143",
+      sha: "abc1234",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toMatchObject({ ref: "refs/heads/aftershock/fix-143", sha: "abc1234" });
+  });
+
+  it("resolves a branch head when given one instead", async () => {
+    const { impl, calls } = writeFetch({
+      "GET /repos/o/r/git/ref/heads/main": { object: { sha: "mainsha" } },
+      "POST /repos/o/r/git/refs": {},
+    });
+    await new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({
+      repo: "o/r",
+      name: "hotfix",
+      from: "main",
+    });
+    expect(calls[1]!.body).toMatchObject({ sha: "mainsha" });
+  });
+
+  it("refuses when given neither", async () => {
+    const { impl } = writeFetch({});
+    await expect(
+      new GitHubClient({ token: "t", fetchImpl: impl }).createBranch({ repo: "o/r", name: "x" }),
+    ).rejects.toThrow(/either a sha or a branch/);
+  });
+});

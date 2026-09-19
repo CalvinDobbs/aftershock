@@ -50,6 +50,12 @@ diagnose(input: { issue, intent, route?, evidence?, hypothesesLimit? },
 repair(input: { issue, diagnosis, intent, workingDirectory, runId, maxAttempts? },
        deps:  { codex, verify, readDiff? }): Promise<RepairOutcome>
 
+// Pushes the branch and opens the PR — draft and labelled unverified when
+// repair() could not verify it. Returns { pullRequest: null, reason } when no
+// attempt produced a diff, so an empty PR is never opened.
+publishPatch(input: { outcome, issue, repo, baseBranch, headSha, workingDirectory, runId },
+             deps:  { github, readFiles? }): Promise<{ pullRequest, commitSha } | { pullRequest: null, reason }>
+
 // Underneath repair(), if a stage ever needs them on their own:
 writePatch(input: { ...repair's, attempt, resumeThreadId?, previousFailure? },
            deps:  { codex, readDiff? }): Promise<Patch>

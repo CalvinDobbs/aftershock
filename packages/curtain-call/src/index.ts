@@ -8,7 +8,6 @@
  */
 export {
   checklistAssignment,
-  verificationLabels,
   verify,
   type VerifyDeps,
   type VerifyInput,
