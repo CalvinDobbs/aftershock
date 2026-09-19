@@ -38,9 +38,23 @@ judge(input: { runId, charter, conformance, differential }): Promise<Finding[]>
 authorIssue(finding: Finding): Promise<Issue>
 
 // Calvin builds these.
-diagnose(input: { issue, intent, hypothesesLimit? }): Promise<Diagnosis>
-writePatch(input: { issue, diagnosis, intent, attempt, resumeThreadId? }): Promise<Patch>
-verify(input: { patch, issue, failedAssignments, baseUrl }): Promise<Verification>
+// Built, on branch calvin/repair-chain. Every stage takes (input, deps):
+// deps is how the model and the browser stack get injected, and how the
+// tests avoid needing either.
+
+diagnose(input: { issue, intent, route?, evidence?, hypothesesLimit? },
+         deps:  { model }): Promise<Diagnosis>
+
+// One call drives the whole repair chain, including the PRD's retry policy.
+// This is the one the stage machine wants.
+repair(input: { issue, diagnosis, intent, workingDirectory, runId, maxAttempts? },
+       deps:  { codex, verify, readDiff? }): Promise<RepairOutcome>
+
+// Underneath repair(), if a stage ever needs them on their own:
+writePatch(input: { ...repair's, attempt, resumeThreadId?, previousFailure? },
+           deps:  { codex, readDiff? }): Promise<Patch>
+verify(input: { patch, issue, failed, fixUrl, baseUrl, route, runId, regressionSuite? },
+       deps:  { runAssignment, runDifferential, screenshotUrlFor? }): Promise<Verification>
 ```
 
 Your `services/api` converges every trigger on one `createRun()`, which hands

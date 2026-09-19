@@ -3,7 +3,10 @@ export {
   renderDiff,
   type ChangedFile,
   type CommitIntent,
+  type FileEdit,
+  type FiledIssue,
   type GitHubClientOptions,
+  type OpenedPullRequest,
 } from "./github.js";
 export { mapRoutes, IMPORT_GRAPH_IMPLEMENTED, type RouteMapOptions } from "./routes.js";
 export { openAiModel, type CharterModel, type OpenAiModelOptions } from "./model.js";

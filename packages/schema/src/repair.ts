@@ -44,6 +44,20 @@ export const Patch = z.object({
   attempt: z.number(),
   verified: z.boolean(),
   previewUrl: z.string().nullable(),
+  /**
+   * Codex thread this patch came from.
+   *
+   * Retry resumes the thread rather than re-prompting, so the second attempt
+   * knows why the first one was written the way it was. Absent when the patch
+   * did not come from Codex.
+   */
+  threadId: z.string().optional(),
+  /**
+   * Set when a patch was rejected before it was ever offered, e.g. it edited
+   * tests or added a dependency. Kept so the reason reaches the PR body rather
+   * than the run simply reporting one fewer attempt.
+   */
+  rejectedFor: z.string().optional(),
 });
 export type Patch = z.infer<typeof Patch>;
 
