@@ -76,6 +76,15 @@ importers:
         specifier: ~4.4.3
         version: 4.4.3
 
+  packages/critic:
+    dependencies:
+      '@aftershock/browser':
+        specifier: workspace:*
+        version: link:../browser
+      '@aftershock/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/schema:
     dependencies:
       zod:
@@ -118,6 +127,9 @@ importers:
       '@aftershock/browser':
         specifier: workspace:*
         version: link:../../packages/browser
+      '@aftershock/critic':
+        specifier: workspace:*
+        version: link:../../packages/critic
       '@aftershock/schema':
         specifier: workspace:*
         version: link:../../packages/schema

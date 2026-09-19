@@ -9,12 +9,14 @@ import {
   type RunDifferentialOptions,
 } from "@aftershock/browser";
 import { AssignmentSchema } from "@aftershock/schema/browser";
+import type { RunEvent } from "@aftershock/schema";
 
 import { runObservableAssignment } from "./assignment-runner.js";
 import { runObservableDifferential } from "./differential-runner.js";
-import { RunEventStream } from "./event-stream.js";
+import { RunEventStream, type EventRepository } from "./event-stream.js";
 import { JsonlEventRepository } from "./jsonl-event-repository.js";
 import { runFromCommit } from "./commit-run.js";
+import { noiseCanary } from "./noise-canary.js";
 import {
   createObservabilityServer,
   type CommitRunRequest,
@@ -25,6 +27,10 @@ import { FileScreenshotRepository } from "./screenshot-repository.js";
 export interface ObservabilityRuntimeOptions {
   dataDirectory: string;
   browserbaseApiKey: string;
+  /** Shauraya can supply Postgres without editing this module. */
+  eventRepository?: EventRepository;
+  emitPipelineEvent?: (runId: string, event: RunEvent) => void | Promise<void>;
+  onCommitRunComplete?: (runId: string, outcome: Awaited<ReturnType<typeof runFromCommit>>) => void | Promise<void>;
 }
 
 export interface ObservabilityRuntime {
@@ -47,7 +53,7 @@ export function createObservabilityRuntime(
   options: ObservabilityRuntimeOptions,
 ): ObservabilityRuntime {
   const eventStream = new RunEventStream(
-    new JsonlEventRepository(join(options.dataDirectory, "traces")),
+    options.eventRepository ?? new JsonlEventRepository(join(options.dataDirectory, "traces")),
   );
   const screenshotRepository = new FileScreenshotRepository(
     join(options.dataDirectory, "screenshots"),
@@ -96,29 +102,15 @@ export function createObservabilityRuntime(
   let canaryCounter = 0;
   const startNoiseCanary = (): DemoRun | undefined => {
     if (canaryActive) return undefined;
-    // The target has to be static. A site whose content changes between two
-    // loads produces real differences, and the canary would then be measuring
-    // the internet rather than the noise filter.
-    const target = process.env.AFTERSHOCK_CANARY_URL || "https://example.com";
-    const instruction =
-      process.env.AFTERSHOCK_CANARY_STEP || "Click the More information link";
-    const assignment = AssignmentSchema.parse({
-      id: "noise-canary",
-      runId: `canary-${Date.now()}-${canaryCounter++}`,
-      archetype: "differential",
-      route: "/",
-      objective: "Compare a deployment against itself and expect nothing",
-      journey: [{ instruction }],
-    });
+    const canary = noiseCanary(`canary-${Date.now()}-${canaryCounter++}`);
+    const { assignment } = canary;
 
     // Claimed only once the assignment is known good. Setting it earlier
     // meant a bad AFTERSHOCK_CANARY_STEP latched the flag and every later
     // request answered 409 until the process restarted.
     canaryActive = true;
     void runObservableDifferential({
-      assignment,
-      previewUrl: target,
-      baseUrl: target,
+      ...canary,
       eventStream,
       screenshotRepository,
     }).then(
@@ -167,6 +159,11 @@ export function createObservabilityRuntime(
       ...(request.maxConcurrent !== undefined ? { maxConcurrent: request.maxConcurrent } : {}),
       eventStream,
       screenshotRepository,
+      ...(options.emitPipelineEvent ? {
+        emitPipelineEvent: (event: RunEvent) => options.emitPipelineEvent!(runId, event),
+      } : {}),
+    }).then(async (outcome) => {
+      await options.onCommitRunComplete?.(runId, outcome);
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`run ${runId} failed:`, error);

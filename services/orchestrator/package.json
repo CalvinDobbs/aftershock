@@ -15,7 +15,8 @@
     "@aftershock/browser": "workspace:*",
     "@aftershock/schema": "workspace:*",
     "@aftershock/scout": "workspace:*",
-    "zod": "~4.4.3"
+    "zod": "~4.4.3",
+    "@aftershock/critic": "workspace:*"
   },
   "devDependencies": {
     "tsx": "4.20.5"

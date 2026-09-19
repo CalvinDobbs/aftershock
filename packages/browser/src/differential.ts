@@ -159,6 +159,7 @@ export async function runDifferential(
     ...(claims ? { claims } : {}),
     route: assignment.route,
   };
+  const recordedAssignment = withRecordedActions(assignment, preview);
   const outcome = compareResults(base, preview, compareOptions);
 
   /**
@@ -222,6 +223,9 @@ export async function runDifferential(
     deltas: outcome.deltas,
     noiseFiltered: outcome.noiseFiltered,
     findings: outcome.findings,
+    completed: !previewFailure && !baseFailed && base.steps.length === assignment.journey.length,
+    ...(recordedAssignment && recordedAssignment.journey.length === assignment.journey.length
+      ? { recordedAssignment } : {}),
     startedAt,
     finishedAt: new Date(now()).toISOString(),
   });

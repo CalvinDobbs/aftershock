@@ -7,14 +7,10 @@
  * replayed to the frontend over SSE, so a finished run is as viewable as a live
  * one.
  *
- * Still to land: the stage machine and the concurrency semaphore sized to
- * MAX_CONCURRENT, dispatching differential pairs first — they need two slots and
- * a half-dispatched pair is useless — then conformance, and emitting one
- * `RunEvent` per stage completion for the dashboard's progressive reveal.
- *
- * Every session is wrapped in try/finally and a reaper sweeps every 60s for
- * anything older than AGENT_TIMEOUT_MS. Leaked sessions are the fastest way to
- * burn the 100-hour grant.
+ * Commit runs dispatch through a weighted semaphore, then the Critic replays
+ * candidates and returns findings plus unpublished issue drafts. Product-stage
+ * events use an injectable sink, separate from browser telemetry. The API run
+ * projection and repair stages are still to land.
  */
 export {
   InMemoryEventRepository,

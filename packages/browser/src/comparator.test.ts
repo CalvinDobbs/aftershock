@@ -22,6 +22,34 @@ const CLAIMS = [
 ];
 
 describe("compareSnapshots", () => {
+  it("ignores anonymous chrome with node IDs but keeps named images", () => {
+    const deltas = compareSnapshots(0,
+      snapshot({ url: "https://base.dev/", formattedTree: "" }),
+      snapshot({ url: "https://preview.dev/", formattedTree: '[0-90] image\n[0-91] scrollable, html\n[0-92] image: Wool scarf' }));
+    const signal = deltas.filter((d) => d.classification === "unclaimed");
+    expect(signal).toHaveLength(1);
+    expect(signal[0]?.preview).toBe("image: Wool scarf");
+  });
+
+  it("pairs exact option values before fuzzy matches despite session-id churn", () => {
+    const base = Array.from({ length: 10 }, (_, i) => `[0-${460 + i}] option: ${i + 1}`).join("\n");
+    const preview = [1, 10, 2, 3, 4, 5, 6, 7, 8, 9].map((n, i) => `[0-${452 + i}] option: ${n}`).join("\n");
+    const deltas = compareSnapshots(2,
+      snapshot({ url: "https://base.dev/cart", formattedTree: base }),
+      snapshot({ url: "https://preview.dev/cart", formattedTree: preview }));
+    expect(deltas.filter((d) => d.classification !== "noise")).toEqual([]);
+    expect(deltas).toHaveLength(10);
+  });
+
+  it("still detects changed prices and missing options after exact pairing", () => {
+    const deltas = compareSnapshots(2,
+      snapshot({ url: "https://base.dev/cart", formattedTree: '[0-10] option: 1\n[0-11] option: 2\n[0-12] StaticText: $84.00' }),
+      snapshot({ url: "https://preview.dev/cart", formattedTree: '[0-25] option: 1\n[0-26] StaticText: $NaN' }));
+    const signal = deltas.filter((d) => d.classification === "unclaimed");
+    expect(signal.some((d) => d.base.includes("$84.00") && d.preview.includes("$NaN"))).toBe(true);
+    expect(signal.some((d) => d.base.includes("option: 2"))).toBe(true);
+  });
+
   it("catches the cart regression the diff never mentioned", () => {
     // The PRD's second planted bug: a shared formatPrice change breaks the
     // cart subtotal on a route the developer never touched.

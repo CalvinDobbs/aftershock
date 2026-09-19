@@ -170,6 +170,10 @@ export const DifferentialResultSchema = z.object({
   /** How many raw differences were dropped as noise, for the run summary. */
   noiseFiltered: z.number().int().nonnegative(),
   findings: z.array(RawFindingSchema),
+  /** The complete captured journey, usable by Critic and Curtain Call without planning. */
+  recordedAssignment: AssignmentSchema.optional(),
+  /** Both sides finished the complete requested journey. Old records omit this. */
+  completed: z.boolean().optional(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime(),
 });

@@ -3,7 +3,9 @@ import type {
   AssignmentResult,
   DifferentialResult,
 } from "@aftershock/schema/browser";
-import type { TestCharter } from "@aftershock/schema";
+import type { Finding, RunEvent, TestCharter } from "@aftershock/schema";
+import { isReplayable, withRecordedActions } from "@aftershock/browser";
+import { authorIssue, judge, selectIssues, type IssueDraft } from "@aftershock/critic";
 import {
   GitHubClient,
   dispatchOrder,
@@ -56,6 +58,8 @@ export interface CommitRunOptions {
   screenshotRepository: ScreenshotRepository;
   github?: GitHubClient;
   model?: CharterModel;
+  /** Shauraya's API/persistence consumes these product events, separate from browser telemetry. */
+  emitPipelineEvent?: (event: RunEvent) => void | Promise<void>;
 }
 
 /**
@@ -80,12 +84,25 @@ export interface CommitRunOutcome {
   differential: DifferentialResult[];
   /** Anything that could not run, and why. The run degrades, it does not abort. */
   skipped: SkippedWork[];
+  findings: Finding[];
+  /** Unpublished: the Director's GitHub integration supplies real issue numbers/URLs. */
+  issueDrafts: IssueDraft[];
 }
 
 /** A differential holds two slots; everything else holds one. */
 const cost = (assignment: Assignment) => (assignment.archetype === "differential" ? 2 : 1);
 
 export async function runFromCommit(options: CommitRunOptions): Promise<CommitRunOutcome> {
+  try {
+    return await executeCommitRun(options);
+  } catch (error) {
+    await options.emitPipelineEvent?.({ type: "run.failed",
+      reason: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+async function executeCommitRun(options: CommitRunOptions): Promise<CommitRunOutcome> {
   const {
     runId,
     previewUrl,
@@ -94,6 +111,9 @@ export async function runFromCommit(options: CommitRunOptions): Promise<CommitRu
     screenshotRepository,
     github = new GitHubClient({ ...(process.env.GITHUB_TOKEN ? { token: process.env.GITHUB_TOKEN } : {}) }),
   } = options;
+
+  const publish = async (event: RunEvent) => { await options.emitPipelineEvent?.(event); };
+  await publish({ type: "stage.start", stage: "scout" });
 
   const intent = await github.readIntent({
     repo: options.repo,
@@ -123,6 +143,8 @@ export async function runFromCommit(options: CommitRunOptions): Promise<CommitRu
   } catch {
     charter = smokeCharter(charterInput);
   }
+  await publish({ type: "scout.complete", charter });
+  await publish({ type: "stage.start", stage: "cast" });
 
   const { assignments, skipped } = toAssignments(charter, {
     runId,
@@ -205,8 +227,36 @@ export async function runFromCommit(options: CommitRunOptions): Promise<CommitRu
       message: `skipped at ${gap.stage}: ${gap.reason}`,
     });
   }
-
-  return { charter, assignments, conformance, differential, skipped: allSkipped };
+  await publish({ type: "cast.complete" });
+  await publish({ type: "stage.start", stage: "critic" });
+  const findings = await judge({ runId, charter, assignments, conformance, differential }, {
+    reproduce: async ({ assignmentId, attempt }) => {
+      const original = assignments.find((a) => a.id === assignmentId);
+      if (!original) throw new Error(`Missing assignment ${assignmentId}`);
+      const pair = differential.find((r) => r.assignmentId === assignmentId);
+      const captured = conformance.find((r) => r.assignmentId === assignmentId);
+      const recorded = pair?.recordedAssignment ?? (captured ? withRecordedActions(original, captured) : null);
+      if (!recorded || !isReplayable(recorded) || recorded.journey.length !== original.journey.length) {
+        throw new Error(`No complete recorded journey for ${assignmentId}`);
+      }
+      const assignment = { ...recorded, id: `${assignmentId}-repro-${attempt}` };
+      if (pair) {
+        if (!baseUrl) throw new Error("Differential reproduction needs a base deployment");
+        const replay = await runObservableDifferential({ assignment, previewUrl, baseUrl,
+          claims: charter.intent.claims, eventStream, screenshotRepository });
+        if (!replay.completed) throw new Error("Reproduction did not complete on both deployments");
+        return { findings: replay.findings };
+      }
+      const replay = await runObservableAssignment({ assignment, targetUrl: previewUrl,
+        mode: "replay", side: "preview", eventStream, screenshotRepository });
+      // Conformance assertion evaluation is a separate implementation task;
+      // an empty result here cannot promote a finding.
+      return { findings: replay.findings };
+    },
+  });
+  await publish({ type: "critic.complete", findings });
+  const issueDrafts = await Promise.all(selectIssues(findings).map(authorIssue));
+  return { charter, assignments, conformance, differential, skipped: allSkipped, findings, issueDrafts };
 }
 
 /**
