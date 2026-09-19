@@ -66,9 +66,13 @@ export class RunEventStream {
     };
   }
 
-  async replay(runId: string, listener: EventListener): Promise<void> {
+  async history(runId: string): Promise<AgentTraceEvent[]> {
     const traces = await this.repository.list(runId);
-    for (const trace of traces.sort((left, right) => left.sequence - right.sequence)) {
+    return traces.sort((left, right) => left.sequence - right.sequence);
+  }
+
+  async replay(runId: string, listener: EventListener): Promise<void> {
+    for (const trace of await this.history(runId)) {
       await listener(trace);
     }
   }
