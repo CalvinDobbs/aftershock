@@ -39,6 +39,7 @@ function fakeSession() {
       snapshot: vi.fn().mockResolvedValue({ formattedTree: "a comments", urlMap: {}, xpathMap: {} }),
       screenshot: vi.fn().mockResolvedValue(new Uint8Array([9, 8, 7])),
       url: vi.fn().mockResolvedValue("https://news.ycombinator.com/item?id=1"),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
     },
     stagehand: {
       observe: vi.fn().mockResolvedValue({
