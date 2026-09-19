@@ -65,7 +65,7 @@ describe("createSessionReplayServiceWithClient", () => {
 
   it("falls back to the HLS content type when the header is absent", async () => {
     const { client: c, replays } = client();
-    replays.retrievePage.mockResolvedValueOnce(new Response(new Uint8Array([120])));
+    vi.mocked(replays.retrievePage).mockResolvedValueOnce(new Response(new Uint8Array([120])));
     const service = createSessionReplayServiceWithClient(c);
     const result = await service.retrievePlaylist("session-1", "0");
     expect(result.contentType).toBe("application/vnd.apple.mpegurl");
