@@ -8,6 +8,7 @@ import {
   type AssignmentStepResult,
 } from "@aftershock/schema/browser";
 
+import { requestedInput, resolveInput, fillInput } from "./input-action.js";
 import { loadBrowserConfig, type BrowserConfig } from "./config.js";
 import { drainPageEvidence } from "./instrument.js";
 import { launchBrowserSession, type BrowserSession, type BrowserSessionFactory } from "./session.js";
@@ -152,13 +153,14 @@ export async function runAssignment(options: RunAssignmentOptions) {
     targetUrl,
     mode,
     side,
-    emit,
+    emit: send,
     writeScreenshot,
     config = loadBrowserConfig(),
     sessionFactory = launchBrowserSession,
     now = Date.now,
     settleMs = 400,
   } = options;
+  const emit: RunAssignmentOptions["emit"] = (event) => send({ ...event, side });
 
   const startedAtMs = now();
   const startedAt = new Date(startedAtMs).toISOString();
@@ -192,7 +194,11 @@ export async function runAssignment(options: RunAssignmentOptions) {
             ? (replayAction(assignment, index).arguments?.[0] ?? null)
             : null;
 
-      if (navigateTo !== null) {
+      const readOnly = /^(?:read|check|verify|assert|inspect|confirm|observe)\b/i.test(journeyStep.instruction.trim());
+      if ((mode === "replay" && replayAction(assignment, index).method === "snapshot") || (mode === "plan" && readOnly)) {
+        action = { method: "snapshot", selector: "", description: journeyStep.instruction };
+        await emit({ ...eventBase(assignment, now), type: "step.executed", index, action, usage: NO_INFERENCE, durationMs: 0 });
+      } else if (navigateTo !== null) {
         const navStartedAt = now();
         await session.page.goto(new URL(navigateTo, targetUrl).toString(), {
           waitUntil: "domcontentloaded",
@@ -214,6 +220,12 @@ export async function runAssignment(options: RunAssignmentOptions) {
           throw new Error(`Stagehand found no action for step ${index}: ${journeyStep.instruction}`);
         }
         action = ActionSchema.parse(candidate);
+        const inputValue = requestedInput(journeyStep.instruction);
+        if (inputValue !== null || action.method === "fill") {
+          const value = inputValue ?? action.arguments?.[0];
+          if (value === undefined) throw new Error("Planned input has no value");
+          action = await resolveInput(session, action, value);
+        }
         await emit({
           ...eventBase(assignment, now),
           type: "step.planned",
@@ -229,9 +241,11 @@ export async function runAssignment(options: RunAssignmentOptions) {
         action = replayAction(assignment, index);
       }
 
-      if (navigateTo === null) {
+      if (navigateTo === null && action.method !== "snapshot") {
         const actionStartedAt = now();
-        const acted = await session.stagehand.act(action);
+        const acted = action.method === "fill"
+          ? (await fillInput(session, action), { metadata: { usage: NO_INFERENCE, actionId: undefined } })
+          : await session.stagehand.act(action);
         await emit({
           ...eventBase(assignment, now),
           type: "step.executed",
@@ -261,6 +275,7 @@ export async function runAssignment(options: RunAssignmentOptions) {
           })
         : undefined;
       const result = {
+        ...(screenshotId ? { screenshotId } : {}),
         index,
         instruction: journeyStep.instruction,
         action,

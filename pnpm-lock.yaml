@@ -79,6 +79,15 @@ importers:
         specifier: ~4.4.3
         version: 4.4.3
 
+  packages/critic:
+    dependencies:
+      '@aftershock/browser':
+        specifier: workspace:*
+        version: link:../browser
+      '@aftershock/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/curtain-call:
     dependencies:
       '@aftershock/browser':
@@ -176,12 +185,24 @@ importers:
       '@aftershock/browser':
         specifier: workspace:*
         version: link:../../packages/browser
+      '@aftershock/critic':
+        specifier: workspace:*
+        version: link:../../packages/critic
+      '@aftershock/curtain-call':
+        specifier: workspace:*
+        version: link:../../packages/curtain-call
       '@aftershock/schema':
         specifier: workspace:*
         version: link:../../packages/schema
       '@aftershock/scout':
         specifier: workspace:*
         version: link:../../packages/scout
+      '@aftershock/sleuth':
+        specifier: workspace:*
+        version: link:../../packages/sleuth
+      '@aftershock/understudy':
+        specifier: workspace:*
+        version: link:../../packages/understudy
       zod:
         specifier: ~4.4.3
         version: 4.4.3

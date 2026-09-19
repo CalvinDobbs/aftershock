@@ -81,6 +81,7 @@ export const StepSnapshotSchema = z.object({
 });
 
 export const AssignmentStepResultSchema = z.object({
+  screenshotId: z.string().optional(),
   index: z.number().int().nonnegative(),
   instruction: z.string(),
   action: ActionSchema,
@@ -111,6 +112,7 @@ export const AssignmentResultSchema = z.object({
   sessionId: z.string(),
   steps: z.array(AssignmentStepResultSchema),
   findings: z.array(RawFindingSchema),
+  evaluation: z.object({ status: z.enum(["passed", "failed", "inconclusive"]), reason: z.string() }).optional(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime(),
 });
@@ -164,12 +166,17 @@ export const SnapshotDeltaSchema = z.object({
 export const DifferentialResultSchema = z.object({
   assignmentId: z.string(),
   previewSessionId: z.string(),
+  previewResult: AssignmentResultSchema.optional(),
   baseSessionId: z.string(),
   /** Every delta, including the ones that were dismissed. */
   deltas: z.array(SnapshotDeltaSchema),
   /** How many raw differences were dropped as noise, for the run summary. */
   noiseFiltered: z.number().int().nonnegative(),
   findings: z.array(RawFindingSchema),
+  /** The complete captured journey, usable by Critic and Curtain Call without planning. */
+  recordedAssignment: AssignmentSchema.optional(),
+  /** Both sides finished the complete requested journey. Old records omit this. */
+  completed: z.boolean().optional(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime(),
 });
@@ -183,6 +190,8 @@ const EventEnvelopeSchema = z.object({
   runId: z.string(),
   assignmentId: z.string(),
   timestamp: z.string().datetime(),
+  /** Explicit attribution when preview and base steps interleave. */
+  side: z.enum(["preview", "base", "fix"]).optional(),
 });
 
 const InferenceUsageSchema = z.object({

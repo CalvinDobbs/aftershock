@@ -135,6 +135,7 @@ export async function runDifferential(
       return DifferentialResultSchema.parse({
         assignmentId: assignment.id,
         previewSessionId: preview.sessionId,
+        previewResult: preview,
         baseSessionId: "",
         deltas: [],
         noiseFiltered: 0,
@@ -159,6 +160,7 @@ export async function runDifferential(
     ...(claims ? { claims } : {}),
     route: assignment.route,
   };
+  const recordedAssignment = withRecordedActions(assignment, preview);
   const outcome = compareResults(base, preview, compareOptions);
 
   /**
@@ -218,10 +220,14 @@ export async function runDifferential(
   return DifferentialResultSchema.parse({
     assignmentId: assignment.id,
     previewSessionId: preview.sessionId,
+    previewResult: { ...preview, findings: outcome.findings },
     baseSessionId: base.sessionId,
     deltas: outcome.deltas,
     noiseFiltered: outcome.noiseFiltered,
     findings: outcome.findings,
+    completed: !previewFailure && !baseFailed && base.steps.length === assignment.journey.length,
+    ...(recordedAssignment && recordedAssignment.journey.length === assignment.journey.length
+      ? { recordedAssignment } : {}),
     startedAt,
     finishedAt: new Date(now()).toISOString(),
   });

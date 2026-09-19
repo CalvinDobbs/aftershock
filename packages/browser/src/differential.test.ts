@@ -119,6 +119,8 @@ describe("runDifferential", () => {
 
     expect(result.previewSessionId).toBe("sess-preview.dev");
     expect(result.baseSessionId).toBe("sess-base.dev");
+    expect(result.completed).toBe(true);
+    expect(result.recordedAssignment?.journey[0]?.action).toEqual(action);
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]!.class).toBe("unclaimed_delta");
     expect(result.findings[0]!.summary).toContain("$132.00");

@@ -21,7 +21,7 @@ packages/schema/src/run.ts                    Run, RunSummary, RunDetail inputs
 ```
 
 **Do not edit:** `packages/schema/src/{finding,events,browser,primitives}.ts`,
-`packages/browser/`, `packages/critic/` or `commit-run.ts` (Anyrudh);
+`packages/browser/`, `packages/critic/` or `commit-run.ts` (Anirudh);
 `packages/schema/src/repair.ts`, `packages/scout/src/github.ts` or the repair
 packages (Calvin).
 
@@ -33,9 +33,9 @@ Agreed up front so three people can build at once. These are in all three task
 files; if one changes, it changes in all three.
 
 ```ts
-// Anyrudh builds these.
+// Anirudh builds these.
 judge(input: { runId, charter, conformance, differential }): Promise<Finding[]>
-authorIssue(finding: Finding): Promise<Issue>
+authorIssue(finding: Finding): Promise<IssueDraft> // unpublished; Director adds GitHub number/url
 
 // Calvin builds these.
 // Built, on branch calvin/repair-chain. Every stage takes (input, deps):
@@ -64,7 +64,7 @@ verify(input: { patch, issue, failed, fixUrl, baseUrl, route, runId, regressionS
 ```
 
 Your `services/api` converges every trigger on one `createRun()`, which hands
-off to Anyrudh's `runFromCommit`. That is the only seam between you.
+off to Anirudh's `runFromCommit`. That is the only seam between you.
 
 ---
 
@@ -141,7 +141,7 @@ additive: write `PostgresEventRepository` alongside `JsonlEventRepository`, do
 not modify the JSONL one.
 
 > **The one overlap on the board.** The repository is constructed in
-> `runtime.ts`, which Anyrudh owns. Ask him to make it injectable first — one
+> `runtime.ts`, which Anirudh owns. Ask him to make it injectable first — one
 > line — then you never touch that file.
 
 **Done when** a finished run survives a restart on a different machine and

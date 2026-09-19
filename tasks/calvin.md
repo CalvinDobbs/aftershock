@@ -2,7 +2,7 @@
 
 **Your half of the product: everything that happens after a bug is confirmed.**
 Sleuth localises it, Understudy patches it with Codex, Curtain Call proves the
-patch works. Plus the GitHub write path, because both you and Anyrudh need it
+patch works. Plus the GitHub write path, because both you and Anirudh need it
 and it sits in a file nobody else is touching.
 
 Board: <https://claude.ai/artifact/TkyxdAg4wZjtuFHKvgbVwe> · Spec: [prd.md](../prd.md) stages 4–6
@@ -11,7 +11,7 @@ Board: <https://claude.ai/artifact/TkyxdAg4wZjtuFHKvgbVwe> · Spec: [prd.md](../
 > three new packages plus the GitHub write path. What is *not* done is a live
 > run: no stage has met a real Codex process, a real browser or a real repo,
 > because each one is reached through an injected dependency that the tests
-> substitute. The wiring in `commit-run.ts` is Anyrudh's.
+> substitute. The wiring in `commit-run.ts` is Anirudh's.
 
 ---
 
@@ -28,7 +28,7 @@ packages/schema/src/repair.ts       Diagnosis, Patch, Verification, PullRequest
 ```
 
 **Do not edit:** `packages/schema/src/{finding,events,browser,primitives}.ts` or
-anything under `services/orchestrator/` (Anyrudh), `apps/web/` or
+anything under `services/orchestrator/` (Anirudh), `apps/web/` or
 `services/api/` (Shauraya).
 
 ---
@@ -39,11 +39,11 @@ Agreed up front so three people can build at once. These are in all three task
 files; if one changes, it changes in all three.
 
 ```ts
-// Anyrudh builds these. You consume them.
+// Anirudh builds these. You consume them.
 judge(input: { runId, charter, conformance, differential }): Promise<Finding[]>
-authorIssue(finding: Finding): Promise<Issue>
+authorIssue(finding: Finding): Promise<IssueDraft> // unpublished; Director adds GitHub number/url
 
-// You build these. Anyrudh calls them from the stage machine.
+// You build these. Anirudh calls them from the stage machine.
 // Built, on branch calvin/repair-chain. Every stage takes (input, deps):
 // deps is how the model and the browser stack get injected, and how the
 // tests avoid needing either.
@@ -69,7 +69,7 @@ verify(input: { patch, issue, failed, fixUrl, baseUrl, route, runId, regressionS
        deps:  { runAssignment, runDifferential, screenshotUrlFor? }): Promise<Verification>
 ```
 
-Export each from the package index. Anyrudh wires them into `commit-run.ts` —
+Export each from the package index. Anirudh wires them into `commit-run.ts` —
 you never edit that file.
 
 ---
@@ -78,7 +78,7 @@ you never edit that file.
 
 `GitHubClient` can only `readIntent` today: compare commits, read a PR body.
 There is **no create-issue, create-branch, commit or open-PR call anywhere in
-the repo.** This blocks Anyrudh's Critic as well as your PR, so do it first —
+the repo.** This blocks Anirudh's Critic as well as your PR, so do it first —
 it is the cheapest unblock on the board.
 
 Add, keeping the existing hand-rolled `fetch` + Zod style rather than pulling in
@@ -204,7 +204,7 @@ fix you could not verify.
 the issue, and a deliberately impossible bug produces an honest unverified draft
 rather than a confident wrong patch.
 
-> Codex runs a full agent loop — budget minutes, not seconds. Tell Anyrudh so
+> Codex runs a full agent loop — budget minutes, not seconds. Tell Anirudh so
 > the stage machine does not block on it. It also defaults to ChatGPT login; in
 > a headless worker force the API-key path through `env`, using the
 > `OPENAI_API_KEY` Scout already requires.
@@ -251,6 +251,6 @@ ends on an opened PR with the line *"and it re-runs the fleet to verify the fix,
 which we have working but not wired to the UI."* Honest, and still complete.
 
 Do not cut Understudy. It is the one stage you can build and test before
-Anyrudh's Critic exists — hand it a hand-written issue, hypothesis and diff and
+Anirudh's Critic exists — hand it a hand-written issue, hypothesis and diff and
 it produces a patch you can inspect. That independence is why it is yours, and
 it is also the OpenAI track.

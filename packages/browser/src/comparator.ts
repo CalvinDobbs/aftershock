@@ -152,10 +152,20 @@ function pairLines(removed: string[], added: string[]): [string, string][] {
   const pairs: [string, string][] = [];
   // Tokenising runs the full normalise pass, so it is done once per line
   // rather than once per candidate pair.
-  const spare = added.map((line) => ({ line, tokens: tokens(line) }));
+  const spare = added.map((line) => ({ line, normalized: normaliseTreeLine(line), tokens: tokens(normaliseTreeLine(line)) }));
 
-  for (const r of removed) {
-    const rt = tokens(r);
+  // Reserve exact semantic matches before fuzzy pairing. Otherwise option 2
+  // can steal option 10 (both tokenise to just "option"), shifting the whole
+  // list and inventing nine changes on identical Meridian cart pages.
+  const unmatched: string[] = [];
+  for (const line of removed) {
+    const match = spare.findIndex((candidate) => candidate.normalized === normaliseTreeLine(line));
+    if (match >= 0) pairs.push([line, spare.splice(match, 1)[0]!.line]);
+    else unmatched.push(line);
+  }
+
+  for (const r of unmatched) {
+    const rt = tokens(normaliseTreeLine(r));
     let best = -1;
     let bestScore = 0;
 
@@ -221,7 +231,7 @@ function treeDeltas(
       if (
         isInjectedWidget(from) ||
         isInjectedWidget(to) ||
-        isAnonymous(from || to)
+        isAnonymous(readable(from || to))
       ) {
         return {
           stepIndex,
@@ -410,7 +420,7 @@ export function isCorruptValue(text: string): boolean {
  * reporting them is noise dressed as a regression.
  */
 function isAnonymous(value: string): boolean {
-  return /^[a-z]+$/i.test(value.trim());
+  return /^(?:scrollable,\s*)?[a-z]+$/i.test(value.trim());
 }
 
 const SEVERITY: Record<DeltaChannel, RawFinding["severity"]> = {

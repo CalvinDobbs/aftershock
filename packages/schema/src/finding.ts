@@ -54,6 +54,8 @@ export const Finding = z.object({
   reproCount: z.number(),
   reproAttempts: z.number(),
   repro: z.array(z.string()),
+  /** Raw observations retained for issue authoring and diagnosis. */
+  evidence: z.array(z.string()).optional(),
   deltas: z.array(Delta).optional(),
   filed: z.boolean(),
 });

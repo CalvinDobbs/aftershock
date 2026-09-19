@@ -66,6 +66,12 @@ describe("pathAndQuery", () => {
 });
 
 describe("normaliseTreeLine", () => {
+  it("preserves role changes rather than hiding the old canary's footer mismatch", () => {
+    expect(normaliseTreeLine("[0-20] LayoutTableRow")).not.toBe(
+      normaliseTreeLine("[0-65] listitem"),
+    );
+  });
+
   it("ignores attribute-only churn", () => {
     expect(normaliseTreeLine('button "Apply" [ref=e17]')).toBe(
       normaliseTreeLine('button "Apply" [ref=e42]'),
