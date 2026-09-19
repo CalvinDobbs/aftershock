@@ -149,7 +149,20 @@ export function createObservabilityRuntime(
       baseUrl: request.baseUrl ?? null,
       ...(request.fallbackRoutes ? { fallbackRoutes: request.fallbackRoutes } : {}),
       ...(request.routeSamples ? { routeSamples: request.routeSamples } : {}),
-      ...(request.criticalJourney ? { criticalJourney: request.criticalJourney } : {}),
+      // Rebuilt rather than spread: zod infers `route?: string | undefined`
+      // and the interface asks for `route?: string`, which
+      // exactOptionalPropertyTypes treats as different types.
+      ...(request.criticalJourney
+        ? {
+            criticalJourney: {
+              description: request.criticalJourney.description,
+              steps: request.criticalJourney.steps,
+              ...(request.criticalJourney.route
+                ? { route: request.criticalJourney.route }
+                : {}),
+            },
+          }
+        : {}),
       ...(request.maxConcurrent !== undefined ? { maxConcurrent: request.maxConcurrent } : {}),
       eventStream,
       screenshotRepository,

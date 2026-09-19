@@ -35,7 +35,11 @@ export const CommitRunRequestSchema = z.object({
   fallbackRoutes: z.array(z.string().startsWith("/", "routes must start with /")).optional(),
   routeSamples: z.record(z.string(), z.string()).optional(),
   criticalJourney: z
-    .object({ description: z.string().min(1), steps: z.array(z.string().min(1)).min(1) })
+    .object({
+      description: z.string().min(1),
+      steps: z.array(z.string().min(1)).min(1),
+      route: z.string().startsWith("/", "routes must start with /").optional(),
+    })
     .optional(),
   maxConcurrent: z.number().int().positive().optional(),
 });

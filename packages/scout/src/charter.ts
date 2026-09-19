@@ -116,6 +116,16 @@ export interface InferCharterInput {
 export interface CriticalJourney {
   description: string;
   steps: string[];
+  /**
+   * Where the journey starts.
+   *
+   * Without this the differential anchors on the diff's highest-confidence
+   * surface, which is exactly backwards: the critical path is the journey
+   * that matters whether or not the commit touched it. A change to checkout
+   * would have started the cart journey on /checkout, and the regression on
+   * /cart would never have been looked at.
+   */
+  route?: string;
 }
 
 export interface InferCharterDeps {
@@ -176,7 +186,7 @@ export function withCriticalPath(
     {
       id: freeId(assertions, "D1"),
       type: "differential",
-      route: primaryRoute(surfaces),
+      route: journey.route ?? primaryRoute(surfaces),
       journey: journey.description,
       steps: journey.steps,
       severity: "critical",

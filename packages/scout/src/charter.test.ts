@@ -154,6 +154,18 @@ describe("withCriticalPath", () => {
     expect(new Set(result.map((a) => a.id)).size).toBe(result.length);
   });
 
+  it("starts the critical journey where the journey says, not where the diff points", () => {
+    // The critical path matters whether or not the commit touched it. Letting
+    // the diff choose its route sends the cart journey to /checkout, and the
+    // regression on /cart is never looked at.
+    const [added] = withCriticalPath([], surfaces, {
+      description: "Buy something",
+      steps: ["Add to cart", "Open the cart"],
+      route: "/cart",
+    });
+    expect(added!.route).toBe("/cart");
+  });
+
   it("does not add a second differential when one already exists", () => {
     const existing = [
       { id: "D1", type: "differential" as const, route: "/", severity: "critical" as const },
