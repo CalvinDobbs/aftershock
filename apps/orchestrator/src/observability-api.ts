@@ -6,10 +6,18 @@ import type { SessionReplayService } from "@aftershock/browser";
 import type { RunEventStream } from "./event-stream.js";
 import type { ScreenshotRepository } from "./screenshot-repository.js";
 
+export interface DemoRun {
+  runId: string;
+  assignmentId: string;
+}
+
+export type DemoRunLauncher = () => DemoRun | undefined;
+
 export interface ObservabilityApiOptions {
   eventStream: RunEventStream;
   replayService: SessionReplayService;
   screenshotRepository: ScreenshotRepository;
+  demoRunLauncher?: DemoRunLauncher;
 }
 
 function sendJson(res: Parameters<RequestListener>[1], status: number, body: unknown): void {
@@ -30,12 +38,37 @@ function writeTrace(res: Parameters<RequestListener>[1], trace: AgentTraceEvent)
 }
 
 export function createObservabilityHandler(options: ObservabilityApiOptions): RequestListener {
-  const { eventStream, replayService, screenshotRepository } = options;
+  const { eventStream, replayService, screenshotRepository, demoRunLauncher } = options;
 
   return async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
       const segments = url.pathname.split("/").filter((part) => part.length > 0).map(decodeURIComponent);
+
+      if (req.method === "GET" && segments.length === 2 && segments[0] === "api" && segments[1] === "runs") {
+        sendJson(res, 200, { runs: await eventStream.runs() });
+        return;
+      }
+
+      if (
+        req.method === "POST" &&
+        segments.length === 3 &&
+        segments[0] === "api" &&
+        segments[1] === "demo" &&
+        segments[2] === "runs"
+      ) {
+        if (!demoRunLauncher) {
+          sendJson(res, 404, { error: "Not found" });
+          return;
+        }
+        const run = await demoRunLauncher();
+        if (!run) {
+          sendJson(res, 409, { error: "A demo run is already active" });
+          return;
+        }
+        sendJson(res, 202, { run });
+        return;
+      }
 
       if (
         req.method === "GET" &&

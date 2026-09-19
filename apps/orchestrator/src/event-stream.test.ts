@@ -47,6 +47,49 @@ describe("RunEventStream", () => {
     expect(listener.mock.calls.map(([trace]) => trace.sequence)).toEqual([0, 1]);
   });
 
+  it("discovers unique run ids", async () => {
+    const stream = new RunEventStream(new InMemoryEventRepository());
+    await stream.publish(event("assignment-1"));
+    await stream.publish({ ...event("assignment-2"), runId: "run-2" });
+    await stream.publish({ ...event("assignment-3"), runId: "run-1" });
+
+    const runIds = (await stream.runs()).map((run) => run.runId).sort();
+    expect(runIds).toEqual(["run-1", "run-2"]);
+  });
+
+  it("summarizes running, completed, and failed runs newest-first", async () => {
+    const stream = new RunEventStream(new InMemoryEventRepository());
+    const closed = {
+      ...event("assignment-1"),
+      runId: "run-done",
+      type: "session.closed",
+      sessionId: "session-1",
+      durationMs: 100,
+    } as AgentEvent;
+    const failed = {
+      ...event("assignment-2"),
+      runId: "run-failed",
+      type: "session.failed",
+      message: "boom",
+    } as AgentEvent;
+
+    await stream.publish({ ...event("assignment-1"), runId: "run-open" });
+    await stream.publish({ ...event("assignment-1"), runId: "run-done" });
+    await stream.publish({ ...closed, timestamp: "2026-09-19T12:01:00.000Z" });
+    await stream.publish({ ...event("assignment-2"), runId: "run-failed", timestamp: "2026-09-19T12:02:00.000Z" });
+    await stream.publish({ ...failed, timestamp: "2026-09-19T12:03:00.000Z" });
+
+    const runs = await stream.runs();
+    const byId = new Map(runs.map((run) => [run.runId, run]));
+
+    expect(byId.get("run-open")?.status).toBe("running");
+    expect(byId.get("run-done")?.status).toBe("completed");
+    expect(byId.get("run-failed")?.status).toBe("failed");
+    expect(byId.get("run-done")?.assignmentCount).toBe(1);
+    expect(byId.get("run-done")?.eventCount).toBe(2);
+    expect(runs[0]?.runId).toBe("run-failed");
+  });
+
   it("isolates disconnected frontend listeners from the run", async () => {
     const stream = new RunEventStream(new InMemoryEventRepository());
     stream.subscribe("run-1", () => {

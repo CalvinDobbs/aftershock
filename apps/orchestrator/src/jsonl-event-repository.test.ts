@@ -41,6 +41,13 @@ describe("JsonlEventRepository", () => {
     expect((await reloaded.list("run-1")).map((trace) => trace.sequence)).toEqual([0, 1]);
     expect((await reloaded.list("run-2")).map((trace) => trace.sequence)).toEqual([0]);
     expect(await reloaded.list("run-3")).toEqual([]);
+    expect(await reloaded.listRunIds()).toEqual(expect.arrayContaining(["run-1", "run-2"]));
+  });
+
+  it("returns no run ids for a missing root directory", async () => {
+    const repository = new JsonlEventRepository(join(directory, "does-not-exist"));
+    expect(await repository.listRunIds()).toEqual([]);
+    expect(await repository.list("run-1")).toEqual([]);
   });
 
   it("serves sorted history through RunEventStream.history", async () => {

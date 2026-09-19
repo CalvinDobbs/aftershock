@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AgentEventSchema, AssignmentSchema } from "./index.js";
+import { AgentEventSchema, AssignmentSchema, RunSummarySchema } from "./index.js";
 
 describe("AssignmentSchema", () => {
   it("accepts an atomic browser journey", () => {
@@ -61,5 +61,20 @@ describe("AgentEventSchema", () => {
 
     expect(event.type).toBe("step.captured");
     if (event.type === "step.captured") expect(event.screenshotId).toBe("screenshot-1");
+  });
+});
+
+describe("RunSummarySchema", () => {
+  it("parses dashboard run summaries", () => {
+    const summary = RunSummarySchema.parse({
+      runId: "run-1",
+      status: "completed",
+      startedAt: "2026-09-19T12:00:00.000Z",
+      updatedAt: "2026-09-19T12:01:00.000Z",
+      assignmentCount: 1,
+      eventCount: 5,
+    });
+
+    expect(summary.status).toBe("completed");
   });
 });

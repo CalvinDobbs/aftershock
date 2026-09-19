@@ -158,6 +158,16 @@ export const AgentTraceEventSchema = z.object({
   event: AgentEventSchema,
 });
 
+export const RunStatusSchema = z.enum(["running", "completed", "failed"]);
+export const RunSummarySchema = z.object({
+  runId: z.string().min(1),
+  status: RunStatusSchema,
+  startedAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  assignmentCount: z.number().int().nonnegative(),
+  eventCount: z.number().int().nonnegative(),
+});
+
 export type Action = z.infer<typeof ActionSchema>;
 export type AgentEvent = z.infer<typeof AgentEventSchema>;
 export type AgentTraceEvent = z.infer<typeof AgentTraceEventSchema>;
@@ -167,4 +177,6 @@ export type AssignmentStepResult = z.infer<typeof AssignmentStepResultSchema>;
 export type ConsoleEntry = z.infer<typeof ConsoleEntrySchema>;
 export type NetworkSummary = z.infer<typeof NetworkSummarySchema>;
 export type RawFinding = z.infer<typeof RawFindingSchema>;
+export type RunStatus = z.infer<typeof RunStatusSchema>;
+export type RunSummary = z.infer<typeof RunSummarySchema>;
 export type StepSnapshot = z.infer<typeof StepSnapshotSchema>;

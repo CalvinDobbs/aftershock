@@ -53,19 +53,38 @@ const screenshotRepository: ScreenshotRepository = {
   get: async (id) => (id === "a".repeat(64) ? storedScreenshot : undefined),
 };
 
+let demoRunResult: { runId: string; assignmentId: string } | undefined;
 let server: Server;
+let noLauncherServer: Server;
 let base: string;
+let noLauncherBase: string;
 const stream = new RunEventStream(new InMemoryEventRepository());
 
 beforeAll(async () => {
-  server = createObservabilityServer({ eventStream: stream, replayService, screenshotRepository });
+  server = createObservabilityServer({
+    eventStream: stream,
+    replayService,
+    screenshotRepository,
+    demoRunLauncher: () => demoRunResult,
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  noLauncherServer = createObservabilityServer({
+    eventStream: stream,
+    replayService,
+    screenshotRepository,
+  });
+  await new Promise<void>((resolve) => noLauncherServer.listen(0, "127.0.0.1", resolve));
+  noLauncherBase = `http://127.0.0.1:${(noLauncherServer.address() as AddressInfo).port}`;
 });
 
 afterAll(async () => {
   await new Promise<void>((resolve, reject) =>
     server.close((error) => (error ? reject(error) : resolve())),
+  );
+  await new Promise<void>((resolve, reject) =>
+    noLauncherServer.close((error) => (error ? reject(error) : resolve())),
   );
 });
 
@@ -131,6 +150,38 @@ describe("observability api", () => {
     const listed = await fetch(`${base}/api/sessions/session-1/recording-downloads`);
     expect(listed.status).toBe(200);
     expect(await listed.json()).toEqual({ downloads });
+  });
+
+  it("lists run summaries", async () => {
+    const response = await fetch(`${base}/api/runs`);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(Array.isArray(body.runs)).toBe(true);
+    const run = body.runs.find((r: { runId: string }) => r.runId === "run-json");
+    expect(run).toMatchObject({
+      runId: "run-json",
+      status: "running",
+      assignmentCount: 1,
+      eventCount: 1,
+    });
+  });
+
+  it("launches demo runs with 202 and rejects concurrent runs with 409", async () => {
+    demoRunResult = { runId: "demo-1", assignmentId: "smoke-stagehand" };
+    const created = await fetch(`${base}/api/demo/runs`, { method: "POST" });
+    expect(created.status).toBe(202);
+    expect(await created.json()).toEqual({ run: demoRunResult });
+
+    demoRunResult = undefined;
+    const conflict = await fetch(`${base}/api/demo/runs`, { method: "POST" });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({ error: "A demo run is already active" });
+  });
+
+  it("returns 404 for demo runs when no launcher is configured", async () => {
+    const response = await fetch(`${noLauncherBase}/api/demo/runs`, { method: "POST" });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not found" });
   });
 
   it("serves stored screenshot bytes with immutable caching", async () => {

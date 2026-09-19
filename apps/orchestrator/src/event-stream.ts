@@ -1,8 +1,9 @@
-import type { AgentEvent, AgentTraceEvent } from "@aftershock/schema";
+import { RunSummarySchema, type AgentEvent, type AgentTraceEvent, type RunSummary } from "@aftershock/schema";
 
 export interface EventRepository {
   append(trace: AgentTraceEvent): Promise<void>;
   list(runId: string): Promise<AgentTraceEvent[]>;
+  listRunIds(): Promise<string[]>;
 }
 
 export type EventListener = (trace: AgentTraceEvent) => void | Promise<void>;
@@ -16,6 +17,10 @@ export class InMemoryEventRepository implements EventRepository {
 
   async list(runId: string): Promise<AgentTraceEvent[]> {
     return this.traces.filter((trace) => trace.event.runId === runId);
+  }
+
+  async listRunIds(): Promise<string[]> {
+    return [...new Set(this.traces.map((trace) => trace.event.runId))];
   }
 }
 
@@ -75,6 +80,35 @@ export class RunEventStream {
     for (const trace of await this.history(runId)) {
       await listener(trace);
     }
+  }
+
+  async runs(): Promise<RunSummary[]> {
+    const summaries: RunSummary[] = [];
+    for (const runId of await this.repository.listRunIds()) {
+      const traces = await this.history(runId);
+      if (traces.length === 0) continue;
+      const events = traces.map((trace) => trace.event);
+      const opened = events.filter((event) => event.type === "session.opened").length;
+      const closed = events.filter((event) => event.type === "session.closed").length;
+      const status: RunSummary["status"] = events.some(
+        (event) => event.type === "session.failed",
+      )
+        ? "failed"
+        : opened > 0 && closed >= opened
+          ? "completed"
+          : "running";
+      summaries.push(
+        RunSummarySchema.parse({
+          runId,
+          status,
+          startedAt: events[0]!.timestamp,
+          updatedAt: events[events.length - 1]!.timestamp,
+          assignmentCount: new Set(events.map((event) => event.assignmentId)).size,
+          eventCount: traces.length,
+        }),
+      );
+    }
+    return summaries.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
   private async sequenceFor(runId: string): Promise<number> {
