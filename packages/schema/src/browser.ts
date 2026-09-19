@@ -29,16 +29,41 @@ export const AssignmentSchema = z.object({
   journey: z.array(JourneyStepSchema).min(1),
 });
 
+export const NetworkRequestSchema = z.object({
+  method: z.string(),
+  url: z.string(),
+  status: z.number().int().optional(),
+  durationMs: z.number().nonnegative().optional(),
+  errorText: z.string().optional(),
+  /**
+   * The application cancelled this itself — an effect cleanup, a superseded
+   * search. Recorded, but never a failure: whether a cancellation happens is
+   * a race, and racing evidence produces findings that will not reproduce.
+   */
+  aborted: z.boolean().optional(),
+});
+
 export const NetworkSummarySchema = z.object({
   requestCount: z.number().int().nonnegative(),
-  failedRequests: z.array(
-    z.object({
-      method: z.string(),
-      url: z.string(),
-      status: z.number().int().optional(),
-      errorText: z.string().optional(),
-    }),
-  ),
+  /**
+   * The calls the app made, bounded. Failures alone are not enough: the
+   * decisive evidence in a diagnosis is often a request that *succeeded*
+   * followed by one that never happened — "the validate call returned 200
+   * and then nothing asked for a new total" localises a bug to client state
+   * before anyone opens a file.
+   */
+  requests: z.array(NetworkRequestSchema).default([]),
+  failedRequests: z.array(NetworkRequestSchema),
+  /**
+   * False when the runtime could not observe the network at all, so an empty
+   * list reads as "not captured" rather than "nothing happened". Silence and
+   * absence of evidence are different claims.
+   *
+   * Defaults to false on purpose. Evidence recorded before this flag existed
+   * came from a path that measurably observed nothing, and defaulting to true
+   * would reparse all of it as a genuine "the app made no requests".
+   */
+  captured: z.boolean().default(false),
 });
 
 export const ConsoleEntrySchema = z.object({
@@ -245,6 +270,7 @@ export type Assignment = z.infer<typeof AssignmentSchema>;
 export type AssignmentResult = z.infer<typeof AssignmentResultSchema>;
 export type AssignmentStepResult = z.infer<typeof AssignmentStepResultSchema>;
 export type ConsoleEntry = z.infer<typeof ConsoleEntrySchema>;
+export type NetworkRequest = z.infer<typeof NetworkRequestSchema>;
 export type NetworkSummary = z.infer<typeof NetworkSummarySchema>;
 export type RawFinding = z.infer<typeof RawFindingSchema>;
 export type RunStatus = z.infer<typeof RunStatusSchema>;

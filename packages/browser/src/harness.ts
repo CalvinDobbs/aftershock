@@ -9,7 +9,7 @@ import {
 } from "@aftershock/schema/browser";
 
 import { loadBrowserConfig, type BrowserConfig } from "./config.js";
-import { collectSessionEvidence } from "./evidence.js";
+import { drainPageEvidence } from "./instrument.js";
 import { launchBrowserSession, type BrowserSession, type BrowserSessionFactory } from "./session.js";
 
 /**
@@ -52,6 +52,15 @@ export interface RunAssignmentOptions {
   config?: BrowserConfig;
   sessionFactory?: BrowserSessionFactory;
   now?: () => number;
+  /**
+   * How long to let the page settle after an action before capturing.
+   *
+   * Requests are buffered when they complete, so draining the instant an act
+   * returns attributes an in-flight call to the next step — or, on the last
+   * step, loses it entirely. A short settle is the difference between seeing
+   * the call an action triggered and seeing nothing.
+   */
+  settleMs?: number;
 }
 
 function eventBase(assignment: Assignment, now: () => number) {
@@ -95,6 +104,7 @@ export async function runAssignment(options: RunAssignmentOptions) {
     config = loadBrowserConfig(),
     sessionFactory = launchBrowserSession,
     now = Date.now,
+    settleMs = 400,
   } = options;
 
   const startedAtMs = now();
@@ -156,11 +166,12 @@ export async function runAssignment(options: RunAssignmentOptions) {
       });
 
       const captureStartedAt = now();
+      if (settleMs > 0) await session.page.waitForTimeout(settleMs);
       const [snapshot, screenshot, url, evidence] = await Promise.all([
         session.page.snapshot(),
         session.page.screenshot(),
         session.page.url(),
-        collectSessionEvidence(session.browserbase, session.sessionId),
+        drainPageEvidence(session.page),
       ]);
       const screenshotBody = Uint8Array.from(screenshot);
       const screenshotId = writeScreenshot

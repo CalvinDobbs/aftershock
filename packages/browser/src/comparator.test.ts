@@ -10,7 +10,7 @@ function snapshot(partial: Partial<StepSnapshot> & { url: string }): StepSnapsho
   return {
     formattedTree: "",
     screenshot: shot,
-    network: { requestCount: 0, failedRequests: [] },
+    network: { requestCount: 0, requests: [], failedRequests: [], captured: true },
     console: [],
     ...partial,
   };
@@ -96,6 +96,8 @@ describe("compareSnapshots", () => {
         url: "https://b.dev/checkout",
         network: {
           requestCount: 4,
+          requests: [],
+          captured: true,
           failedRequests: [{ method: "POST", url: "https://b.dev/api/orders", status: 500 }],
         },
       }),
@@ -106,10 +108,34 @@ describe("compareSnapshots", () => {
     expect(net?.base).toBe("ok on base");
   });
 
+  it("stays silent when one side never observed the network", () => {
+    // Not looking is not the same as nothing being wrong. Comparing an empty
+    // capture against a real one invents failures on whichever side looked.
+    const deltas = compareSnapshots(
+      0,
+      snapshot({
+        url: "https://a.dev/cart",
+        network: { requestCount: 0, requests: [], failedRequests: [], captured: false },
+      }),
+      snapshot({
+        url: "https://b.dev/cart",
+        network: {
+          requestCount: 2,
+          requests: [],
+          captured: true,
+          failedRequests: [{ method: "GET", url: "https://b.dev/api/cart", status: 500 }],
+        },
+      }),
+    );
+    expect(deltas.filter((d) => d.channel === "network")).toHaveLength(0);
+  });
+
   it("ignores a failure that is already broken on base", () => {
     // Aftershock never reports a bug that already existed on main.
     const failing = {
       requestCount: 3,
+      requests: [],
+      captured: true,
       failedRequests: [{ method: "POST", url: "https://host/api/subscribe", status: 500 }],
     };
     const deltas = compareSnapshots(

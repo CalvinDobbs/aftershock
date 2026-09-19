@@ -5,9 +5,10 @@ import type { AgentEvent, Assignment } from "@aftershock/schema/browser";
 import type { BrowserConfig } from "./config.js";
 import type { BrowserSession } from "./session.js";
 
-vi.mock("./evidence.js", () => ({
-  collectSessionEvidence: vi.fn().mockResolvedValue({
-    network: { requestCount: 2, failedRequests: [] },
+vi.mock("./instrument.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./instrument.js")>()),
+  drainPageEvidence: vi.fn().mockResolvedValue({
+    network: { requestCount: 2, requests: [], failedRequests: [], captured: true },
     console: [],
   }),
 }));
@@ -75,6 +76,7 @@ function fakeSession() {
         goto,
         snapshot: vi.fn().mockResolvedValue({ formattedTree: "button Apply", urlMap: {}, xpathMap: {} }),
         screenshot: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
         url: vi.fn().mockResolvedValue("https://preview.example/checkout"),
       },
       stagehand: { observe, act },

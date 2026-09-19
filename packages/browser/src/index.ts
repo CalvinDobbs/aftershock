@@ -1,5 +1,10 @@
 export { loadBrowserConfig, type BrowserConfig } from "./config.js";
-export { collectSessionEvidence } from "./evidence.js";
+export {
+  drainPageEvidence,
+  EVIDENCE_KEY,
+  INSTRUMENT_SCRIPT,
+  type EvidencePage,
+} from "./instrument.js";
 export {
   AssignmentFailedError,
   runAssignment,

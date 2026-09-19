@@ -268,6 +268,12 @@ function networkDeltas(
   route: string,
 ): SnapshotDelta[] {
   const out: SnapshotDelta[] = [];
+
+  // One side not observing the network is not the same as that side being
+  // healthy. Comparing an empty capture against a real one invents failures
+  // on whichever side happened to be looking.
+  if (!base.captured || !preview.captured) return out;
+
   const key = (f: NetworkSummary["failedRequests"][number]) =>
     `${f.method} ${pathAndQuery(f.url)}`;
 

@@ -2,6 +2,7 @@ import { Browserbase } from "@browserbasehq/sdk";
 import { browserbase, Stagehand, type BrowserContext, type Page } from "@browserbasehq/stagehand";
 
 import type { BrowserConfig } from "./config.js";
+import { INSTRUMENT_SCRIPT } from "./instrument.js";
 
 export interface BrowserSession {
   sessionId: string;
@@ -48,6 +49,11 @@ export const launchBrowserSession: BrowserSessionFactory = async (config) => {
         ...(config.modelApiKey ? { apiKey: config.modelApiKey } : {}),
       },
     });
+    // Installed before any navigation so it is present on the first document
+    // and every one after it. An init script added later would miss the load
+    // that matters most.
+    await browser.context.addInitScript(INSTRUMENT_SCRIPT);
+
     const page = await activePage(browser.context);
     const liveView = await client.sessions.debug(sessionId).catch(() => undefined);
     let closed = false;

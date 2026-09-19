@@ -6,9 +6,10 @@ import type { BrowserConfig } from "./config.js";
 import type { BrowserSession } from "./session.js";
 import { isReplayable, runDifferential, withRecordedActions } from "./differential.js";
 
-vi.mock("./evidence.js", () => ({
-  collectSessionEvidence: vi.fn().mockResolvedValue({
-    network: { requestCount: 1, failedRequests: [] },
+vi.mock("./instrument.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./instrument.js")>()),
+  drainPageEvidence: vi.fn().mockResolvedValue({
+    network: { requestCount: 2, requests: [], failedRequests: [], captured: true },
     console: [],
   }),
 }));
@@ -42,6 +43,7 @@ function session(host: string, tree: string, observe = vi.fn()) {
       snapshot: vi.fn().mockResolvedValue({ formattedTree: tree }),
       screenshot: vi.fn().mockResolvedValue(Buffer.from([1, 2, 3])),
       url: vi.fn().mockReturnValue(`https://${host}/cart`),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
     },
     stagehand: {
       observe: observe.mockResolvedValue({
@@ -76,7 +78,7 @@ describe("isReplayable / withRecordedActions", () => {
             url: "https://a.dev/cart",
             formattedTree: "",
             screenshot: new Uint8Array([1]),
-            network: { requestCount: 0, failedRequests: [] },
+            network: { requestCount: 0, requests: [], failedRequests: [], captured: true },
             console: [],
           },
           durationMs: 1,
