@@ -23,16 +23,22 @@ export async function GET(_req: Request, ctx: { params: Promise<{ runId: string 
       charter: d.charter,
       assignments: d.assignments,
       findings: d.findings,
+      issues: d.issues,
       diagnosis: d.diagnosis,
       patch: d.patch,
       verification: d.verification,
       pullRequest: d.pullRequest,
-    }).map((e) =>
-      e.kind === 'message'
-        ? { kind: e.kind, bot: e.bot, at: e.at, body: e.body, attach: e.attachments.map((a) => a.kind) }
-        : e.kind === 'handoff'
-          ? { kind: e.kind, from: e.from, to: e.to, lead: e.lead, tail: e.tail }
-          : e,
-    ),
+    }).map((e) => {
+      switch (e.kind) {
+        case 'message':
+          return { kind: e.kind, bot: e.bot, at: e.at, body: e.body, attach: e.attachments.map((a) => a.kind) };
+        case 'handoff':
+          return { kind: e.kind, from: e.from, to: e.to, lead: e.lead, tail: e.tail };
+        case 'browsers':
+          return { kind: e.kind, note: e.note, feeds: e.feeds.map((f) => `${f.assignmentId}:${f.state}`) };
+        default:
+          return e;
+      }
+    }),
   );
 }

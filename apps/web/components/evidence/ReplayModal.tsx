@@ -26,6 +26,7 @@ export function ReplayModal({
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -60,6 +61,7 @@ export function ReplayModal({
       const src = `/api/replays/${sessionId}/${page.pageId}`;
       const el = video.current;
       if (!el) return;
+      el.addEventListener('loadeddata', () => !cancelled && setReady(true), { once: true });
 
       // hls.js first, native second. Chromium answers canPlayType() for
       // `application/vnd.apple.mpegurl` with a non-empty "maybe" and then fails
@@ -119,8 +121,22 @@ export function ReplayModal({
               </div>
             </div>
           ) : (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video ref={video} controls autoPlay playsInline className="block max-h-[62vh] w-full" />
+            <div className="relative">
+              {!ready && (
+                <div className="breathe absolute inset-0 flex items-center justify-center">
+                  <span className="mono text-[11.5px]/[1] text-ink-8">loading the recording</span>
+                </div>
+              )}
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <video
+                ref={video}
+                controls
+                autoPlay
+                playsInline
+                className={`block max-h-[62vh] w-full ${ready ? 'reveal' : 'opacity-0'}`}
+                style={{ minHeight: ready ? undefined : 320 }}
+              />
+            </div>
           )}
         </div>
 

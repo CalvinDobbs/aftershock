@@ -50,11 +50,11 @@ and, once it exists, `AFTERSHOCK_API_URL`.
 
 ## The room
 
-A run is a thread every bot is in. Eight bots, one per pipeline stage:
+A run is a thread every bot is in. Seven bots in the rail, one per pipeline
+stage:
 
 | Bot | Stage | Job |
 | --- | --- | --- |
-| Maestro | Director | runs the room, writes to GitHub |
 | Diffany | Scout | turns the diff into claims |
 | QAizen | Cast · conformance | checks a claim start to finish |
 | Doppler | Cast · differential | runs your branch against main |
@@ -63,14 +63,15 @@ A run is a thread every bot is in. Eight bots, one per pipeline stage:
 | Patchouli | Understudy | writes the smallest patch |
 | Encore | Curtain Call | re-runs the same browsers |
 
-The Claude Design source draws eleven. Havoc (adversary), Wanda (explorer) and
-Nitpick were cut in the PRD's own pre-agreed cut order — see [design.md](design.md#the-cast).
+**Maestro** (the Director) has no rail row — it is deterministic code, so it
+speaks as the room's centred system lines. The Claude Design source draws
+eleven bots; Havoc, Wanda and Nitpick were cut in the PRD's own pre-agreed cut
+order. See [design.md](design.md#the-cast).
 
-Two views, toggled by the monitor icon in the run header:
-
-- **Room** — the thread, with evidence posted as attachments.
-- **Browsers** — every session at once. Failing agents stay expanded, passing
-  agents collapse, differential pairs span two columns and show both sides.
+One view. The rail shows who is working and on what; the thread carries the
+conversation, the browsers, and the issue when Gavel files it. There is no
+right-hand panel and no separate Browsers page — the recordings sit inline in
+16:10 boxes that reserve their height before the video loads.
 
 ---
 

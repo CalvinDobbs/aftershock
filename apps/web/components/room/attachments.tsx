@@ -1,47 +1,32 @@
 'use client';
 
-import { useState } from 'react';
-import type { Assignment, Finding, Step } from '@aftershock/schema';
+import clsx from 'clsx';
+import type { Assignment, Finding } from '@aftershock/schema';
 import type { Attachment } from '@/lib/room';
+import { botFor } from '@/lib/room';
 import { BOTS } from '@/components/bots/registry';
-import { BotAvatar } from '@/components/bots/BotAvatar';
 import { BrowserFrame } from '@/components/ui/BrowserFrame';
 import { PageShot } from '@/components/ui/PageShot';
-import { Scrubber, StatePill } from '@/components/ui/atoms';
-import { ReplayModal } from '@/components/evidence/ReplayModal';
-import { botFor } from '@/lib/room';
-import { duration } from '@/lib/format';
+import { IssueCard } from './IssueCard';
 
-/** The failing frame and the one immediately before it — the persuasive pair. */
-function evidencePair(a: Assignment): { before?: Step; after?: Step } {
-  const withDigest = a.steps.filter((s) => s.digest || s.screenshotUrl);
-  const after = [...withDigest].reverse().find((s) => !s.ok) ?? withDigest.at(-1);
-  const before = withDigest.filter((s) => s.idx < (after?.idx ?? 0)).at(-1);
-  return { before, after };
-}
-
-export function Attachments({ items, host }: { items: Attachment[]; host: string }) {
+export function Attachments({ items }: { items: Attachment[] }) {
   return (
     <>
       {items.map((a, i) => (
-        <div key={i} className="mt-[9px]">
-          <One a={a} host={host} />
-        </div>
+        <One key={i} a={a} />
       ))}
     </>
   );
 }
 
-function One({ a, host }: { a: Attachment; host: string }) {
+function One({ a }: { a: Attachment }) {
   switch (a.kind) {
     case 'assertions':
       return <AssertionRows rows={a.rows} />;
-    case 'recording':
-      return <RecordingCard assignment={a.assignment} host={host} />;
+    case 'values':
+      return <ValueReadout {...a} />;
     case 'diffpair':
       return <DiffPair {...a} />;
-    case 'live':
-      return <LiveCard assignment={a.assignment} host={host} />;
     case 'verdict':
       return <VerdictCard finding={a.finding} />;
     case 'citation':
@@ -50,6 +35,15 @@ function One({ a, host }: { a: Attachment; host: string }) {
       return <PatchCard diff={a.patch.diff} branch={a.patch.branch} />;
     case 'verification':
       return <VerificationCard rows={a.verification.rows} />;
+    case 'issue':
+      return (
+        <IssueCard
+          issue={a.issue}
+          finding={a.finding}
+          verification={a.verification}
+          compact={a.compact}
+        />
+      );
   }
 }
 
@@ -57,119 +51,59 @@ function One({ a, host }: { a: Attachment; host: string }) {
 
 function AssertionRows({ rows }: { rows: { id: string; statement: string; source: string }[] }) {
   return (
-    <div className="flex flex-col gap-[5px]">
+    <div className="mt-[9px] flex flex-col gap-[5px]">
       {rows.map((r) => (
         <div key={r.id} className="flex items-baseline gap-2.5">
           <span className="mono w-5 flex-none text-[11px]/[1.5] font-medium text-ink-8">{r.id}</span>
           <span className="flex-1 text-[13.5px]/[1.5] text-[#a8a8a8]">{r.statement}</span>
-          <span className="mono flex-none text-[11px]/[1.5] text-ink-8">{r.source}</span>
+          <span className="mono hidden flex-none text-[11px]/[1.5] text-ink-8 sm:block">
+            {r.source}
+          </span>
         </div>
       ))}
     </div>
   );
 }
 
-// --- QAizen's recording -----------------------------------------------------
+// --- the value that did not move --------------------------------------------
 
 /**
- * The value the assertion expected, for the caption under the failing frame.
+ * A before/after readout rather than two more screenshots.
  *
- * PLACEHOLDER — parsed out of the step label the agent wrote. The Cast knows
- * this value exactly at the moment it asserts, so the right home for it is a
- * structured field on the failing Step (`expected`, alongside `digest`). Until
- * the runner emits one, this reads whatever the agent put in the label and
- * shows nothing if it cannot find it. Never invent a value here.
+ * The recording is already in the browsers row above; repeating it as a pair
+ * of page mocks says the same thing twice and doubles the height of the
+ * message. Two numbers side by side make the argument faster.
  */
-function expectedLabel(step?: Step): string | undefined {
-  const m = step?.label.match(/expected\s+([^)]+?)\)?\s*$/i);
-  return m?.[1] ? `expected ${m[1].trim()}` : undefined;
-}
-
-function RecordingCard({ assignment: a, host }: { assignment: Assignment; host: string }) {
-  const [open, setOpen] = useState(false);
-  const { before, after } = evidencePair(a);
-  const url = `${host}${a.route}`;
-
-  // Flag the frame by its own outcome, not the assignment's. When the failing
-  // step has no capture, `evidencePair` falls back to a step that did pass,
-  // and painting that one red would misattribute the failure.
-  const flagged = after?.ok === false;
-
-  // The playhead marks the middle of the slot belonging to the frame shown
-  // beside it, so the scrubber and the screenshot always agree. Step indices
-  // are 1-based, hence the half-step offset.
-  const playhead = after && a.steps.length > 0 ? (after.idx - 0.5) / a.steps.length : 0;
-
+function ValueReadout({
+  label,
+  before,
+  after,
+  expected,
+}: {
+  label: string;
+  before: string;
+  after: string;
+  expected?: string;
+}) {
   return (
-    <div className="flex flex-col gap-[11px] rounded-[14px] bg-card-2 p-[13px]">
-      <div className="flex items-center gap-[9px] px-[3px]">
-        <span className="text-[13.5px]/[1] font-medium text-ink-1">Recording</span>
-        <span className="mono text-[12px]/[1] text-ink-6">
-          {a.sessionId} · {a.steps.length} steps · {duration(a.durationMs)}
-        </span>
-        <span className="flex-1" />
-        <StatePill state={a.status === 'failed' ? 'failed' : 'finished'} />
-      </div>
-
-      <div className="flex gap-[11px]">
-        <Shot step={before} url={url} caption={`step ${before?.idx ?? '—'} — before`} />
-        <Shot
-          step={after}
-          url={url}
-          caption={`step ${after?.idx ?? '—'} — ${flagged ? 'unchanged' : 'after'}`}
-          note={flagged ? expectedLabel(after) : undefined}
-          bad={flagged}
-        />
-      </div>
-
-      <Scrubber duration={duration(a.durationMs)} steps={a.steps.length} position={playhead} />
-
-      <div className="flex px-[3px]">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-full bg-chip px-[11px] py-[5px] text-[11.5px]/[1] text-ink-5 transition-colors hover:bg-[#2e2e2e] hover:text-ink-2"
-        >
-          Open replay
-        </button>
-      </div>
-
-      {open && a.sessionId && (
-        <ReplayModal sessionId={a.sessionId} title={a.brief} onClose={() => setOpen(false)} />
+    <div className="mt-[9px] flex flex-wrap items-baseline gap-x-3 gap-y-1.5 rounded-[11px] bg-card-2 px-3.5 py-3">
+      <span className="text-[12px]/[1] text-ink-8">{label}</span>
+      <span className="mono text-[13px]/[1] text-ink-4">{before}</span>
+      <span className="text-[12px]/[1] text-ink-8">after apply</span>
+      <span className="mono text-[13px]/[1] font-medium text-alarm">{after}</span>
+      {expected && (
+        <>
+          <span className="text-[12px]/[1] text-ink-8">should read</span>
+          <span className="mono text-[13px]/[1] text-plus">{expected.replace(/^expected\s+/i, '')}</span>
+        </>
       )}
     </div>
   );
 }
 
-function Shot({
-  step,
-  url,
-  caption,
-  note,
-  bad = false,
-}: {
-  step?: Step;
-  url: string;
-  caption: string;
-  note?: string;
-  bad?: boolean;
-}) {
-  return (
-    <div className="flex-1">
-      <BrowserFrame url={url} flagged={bad}>
-        <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
-      </BrowserFrame>
-      <div className="mt-[7px] flex justify-between">
-        <span className={bad ? 'text-[11px]/[1.5] text-alarm' : 'text-[11px]/[1.5] text-ink-6'}>
-          {caption}
-        </span>
-        {note && <span className="mono text-[11px]/[1.5] text-ink-6">{note}</span>}
-      </div>
-    </div>
-  );
-}
-
 // --- Doppler's paired panes -------------------------------------------------
+
+const shorten = (s: string) => s.replace(/^\[data-testid="(.+)"\]$/, '$1').replace(/-/g, ' ');
 
 function DiffPair({
   baseLabel,
@@ -182,18 +116,21 @@ function DiffPair({
 }) {
   const Panel = ({ label, side, flagged }: { label: string; side: 'base' | 'head'; flagged: boolean }) => (
     <div
-      className="flex-1 rounded-[11px] bg-card-2 px-3 py-[11px]"
+      className="min-w-0 flex-1 rounded-[11px] bg-card-2 px-3 py-[11px]"
       style={{ outline: flagged ? '1.5px solid var(--color-flare)' : undefined }}
     >
-      <div className="mono mb-[9px] text-[10.5px]/[1] text-ink-6">{label}</div>
+      <div className="mono mb-[9px] truncate text-[10.5px]/[1] text-ink-6">{label}</div>
       {rows.map((r) => {
         const v = side === 'base' ? r.base : r.head;
         const hot = side === 'head' && r.differs;
         return (
-          <div key={r.label} className="mb-1.5 flex justify-between last:mb-0">
-            <span className="max-w-[60%] truncate text-[12px]/[1] text-ink-7">{shorten(r.label)}</span>
+          <div key={r.label} className="mb-1.5 flex justify-between gap-2 last:mb-0">
+            <span className="truncate text-[12px]/[1] text-ink-7">{shorten(r.label)}</span>
             <span
-              className={hot ? 'mono text-[12px]/[1] font-medium text-alarm' : 'mono text-[12px]/[1] text-ink-2'}
+              className={clsx(
+                'mono shrink-0 text-[12px]/[1]',
+                hot ? 'font-medium text-alarm' : 'text-ink-2',
+              )}
             >
               {v}
             </span>
@@ -203,50 +140,22 @@ function DiffPair({
     </div>
   );
 
-  const anyDiff = rows.some((r) => r.differs);
   return (
-    <div className="flex gap-[11px]">
+    <div className="mt-[9px] flex gap-[11px]">
       <Panel label={baseLabel} side="base" flagged={false} />
-      <Panel label={headLabel} side="head" flagged={anyDiff} />
-    </div>
-  );
-}
-
-const shorten = (s: string) => s.replace(/^\[data-testid="(.+)"\]$/, '$1').replace(/-/g, ' ');
-
-// --- a Cast member mid-assignment -------------------------------------------
-
-function LiveCard({ assignment: a, host }: { assignment: Assignment; host: string }) {
-  const last = a.steps.at(-1);
-  const elapsed = a.startedAt
-    ? Math.round((Date.now() - Date.parse(a.startedAt)) / 1000)
-    : 0;
-  const rec = `${Math.floor(elapsed / 60)}:${String(Math.max(0, elapsed % 60)).padStart(2, '0')}`;
-
-  return (
-    <div className="flex flex-col gap-2.5 rounded-[14px] bg-card-2 p-[13px]">
-      <div className="flex items-center gap-[9px] px-[3px]">
-        <span className="text-[13.5px]/[1] font-medium text-ink-1">Browser</span>
-        <span className="text-[12px]/[1] text-ink-6">{a.brief}</span>
-        <span className="flex-1" />
-        <StatePill state="working" />
-      </div>
-
-      {/* PLACEHOLDER — the cursor mark is parked at a fixed spot. The real
-          position is the bounding box of the element the pending Action
-          targets; surface it on the Action and pass it through here. */}
-      <BrowserFrame url={`${host}${a.route}`} live rec={rec} cursor={{ left: '62%', top: '58%' }}>
-        <PageShot digest={last?.digest} screenshotUrl={last?.screenshotUrl} scale="lg" />
-      </BrowserFrame>
-
-      <div className="mono px-[3px] text-[11px]/[1.5] text-ink-6">
-        step {a.steps.length} · {last?.label ?? 'starting'} · screenshots kept every action
-      </div>
+      <Panel label={headLabel} side="head" flagged={rows.some((r) => r.differs)} />
     </div>
   );
 }
 
 // --- Gavel's ledger for a finding that did not clear the gate ---------------
+
+const classLabel = (c: string) =>
+  ({
+    hard_failure: 'hard failure — 5xx or uncaught',
+    unclaimed_delta: 'differs from main, nothing claimed it',
+    assertion_violation: 'contradicts an assertion',
+  })[c] ?? c;
 
 function VerdictCard({ finding }: { finding: Finding }) {
   const rows = [
@@ -258,25 +167,22 @@ function VerdictCard({ finding }: { finding: Finding }) {
   ];
 
   return (
-    <div className="rounded-[14px] border border-dashed border-edge-3 bg-[#181818] px-[15px] py-[13px]">
-      <div className="mb-[9px] flex items-center justify-between">
+    <div className="mt-[9px] rounded-[14px] border border-dashed border-edge-3 bg-card px-[15px] py-[13px]">
+      <div className="mb-[9px] flex items-center justify-between gap-2.5">
         <span
           className="text-[14px]/[1.3] text-ink-9 line-through"
           style={{ textDecorationColor: '#3e3e3e' }}
         >
           {finding.title}
         </span>
-        <span
-          className="ml-2.5 flex-none rounded-full bg-chip px-[9px] py-[5px] text-[10.5px]/[1] font-medium text-ink-9"
-          style={{ letterSpacing: '.07em' }}
-        >
-          NOT FILED
+        <span className="mono flex-none rounded-full bg-chip px-[9px] py-[5px] text-[10px]/[1] text-ink-9">
+          not filed
         </span>
       </div>
       {rows.map((r, i) => (
-        <div key={i} className="flex justify-between border-t border-chip py-1.5">
+        <div key={i} className="flex justify-between gap-3 border-t border-chip py-1.5">
           <span className="text-[12.5px]/[1.4] text-ink-9">{r.label}</span>
-          <span className="mono text-[12px]/[1.4] text-ink-5">{r.value}</span>
+          <span className="mono shrink-0 text-[12px]/[1.4] text-ink-5">{r.value}</span>
         </div>
       ))}
       <div className="flex justify-between border-t border-chip pt-[7px]">
@@ -289,13 +195,6 @@ function VerdictCard({ finding }: { finding: Finding }) {
     </div>
   );
 }
-
-const classLabel = (c: string) =>
-  ({
-    hard_failure: 'hard failure — 5xx or uncaught',
-    unclaimed_delta: 'differs from main, nothing claimed it',
-    assertion_violation: 'contradicts an assertion',
-  })[c] ?? c;
 
 // --- Clueso citing a frame somebody else captured ---------------------------
 
@@ -312,15 +211,15 @@ function Citation({
   const bot = BOTS[botFor(assignment)];
 
   return (
-    <div className="flex items-center gap-3 rounded-[13px] bg-[#181818] px-[13px] py-[11px]">
-      <div className="w-[150px] flex-none">
+    <div className="mt-[9px] flex items-center gap-3 rounded-[13px] bg-card px-[13px] py-[11px]">
+      <div className="w-[136px] flex-none">
         <BrowserFrame dots={3} radius={7}>
           <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="sm" />
         </BrowserFrame>
       </div>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <div className="mono text-[11px]/[1.5] text-ink-6">
-          CITED · {bot.name.toUpperCase()} · {assignment.assertionId} · STEP {stepIdx}
+          {bot.name} · {assignment.assertionId} · step {stepIdx}
         </div>
         <div className="mt-[3px] text-[13px]/[1.55] text-ink-7">{note}</div>
       </div>
@@ -333,7 +232,7 @@ function Citation({
 export function PatchCard({ diff, branch }: { diff: string; branch?: string }) {
   const lines = diff.split('\n').filter((l) => !/^(diff --git|index |--- |\+\+\+ )/.test(l));
   return (
-    <div className="rounded-[13px] bg-[#181818] px-[13px] py-3">
+    <div className="mt-[9px] rounded-[13px] bg-card px-[13px] py-3">
       <div className="mono overflow-x-auto rounded-[8px] bg-shot px-3 py-2.5 text-[11.5px]/[1.7]">
         {lines.map((l, i) => (
           <div
@@ -352,11 +251,7 @@ export function PatchCard({ diff, branch }: { diff: string; branch?: string }) {
           </div>
         ))}
       </div>
-      {branch && (
-        <div className="mono mt-[9px] text-[11px]/[1.5] text-ink-8">
-          {branch} · two attempts, then it opens as a draft marked unverified
-        </div>
-      )}
+      {branch && <div className="mono mt-[9px] text-[11px]/[1.5] text-ink-8">{branch}</div>}
     </div>
   );
 }
@@ -366,25 +261,19 @@ export function PatchCard({ diff, branch }: { diff: string; branch?: string }) {
 function VerificationCard({
   rows,
 }: {
-  rows: {
-    label: string;
-    before: string;
-    after: string;
-    beforeValue?: string;
-    afterValue?: string;
-  }[];
+  rows: { label: string; beforeValue?: string; afterValue?: string }[];
 }) {
   return (
-    <div className="rounded-[13px] bg-[#181818] px-[14px] py-3">
+    <div className="mt-[9px] rounded-[13px] bg-card px-[14px] py-3">
       {rows.map((r, i) => (
         <div
           key={i}
           className="flex items-center gap-3 border-t border-chip py-[9px] first:border-t-0 first:pt-0"
         >
-          <span className="flex-1 text-[12.5px]/[1.45] text-ink-5">{r.label}</span>
-          <span className="mono text-[12px]/[1] text-alarm line-through">{r.beforeValue}</span>
-          <span className="text-[12px]/[1] text-ink-8">→</span>
-          <span className="mono text-[12px]/[1] text-plus">{r.afterValue}</span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px]/[1.45] text-ink-5">{r.label}</span>
+          <span className="mono shrink-0 text-[12px]/[1] text-alarm line-through">{r.beforeValue}</span>
+          <span className="shrink-0 text-[12px]/[1] text-ink-8">→</span>
+          <span className="mono shrink-0 text-[12px]/[1] text-plus">{r.afterValue}</span>
         </div>
       ))}
     </div>

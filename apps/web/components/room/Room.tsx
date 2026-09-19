@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RunDetail, RunSummary } from '@aftershock/schema';
 import type { BotId } from '@/components/bots/registry';
+import { BOTS } from '@/components/bots/registry';
 import { useRunStream } from '@/lib/useRunStream';
 import { duration } from '@/lib/format';
 import { Sidebar, type RosterStatus } from './Sidebar';
@@ -10,52 +11,35 @@ import { RunHeader } from './RunHeader';
 import { Message } from './Message';
 import { Handoff } from './Handoff';
 import { SystemLine } from './SystemLine';
-import { Waiting } from './Waiting';
+import { Typing } from './Typing';
 import { Composer } from './Composer';
-import { BrowsersGrid } from './BrowsersGrid';
-import { IssueRail } from './IssueRail';
-
-const strip = (u: string | null) => (u ?? '').replace(/^https?:\/\//, '');
+import { BrowsersRow } from './BrowsersRow';
 
 export function Room({
   runId,
   seed,
   runs,
-  maxConcurrent,
 }: {
   runId: string;
   seed: RunDetail;
   runs: RunSummary[];
-  maxConcurrent: number;
 }) {
-  // speed 1 paces the stored run back out (the demo reveal); speed 0 replays
-  // it instantly, which is what you want when browsing a finished run.
+  // speed 1 paces the stored run back out; speed 0 replays it instantly,
+  // which is what you want when browsing a run that finished hours ago.
   const [speed, setSpeed] = useState(1);
   const { state, entries } = useRunStream(runId, seed, speed);
-  const [view, setView] = useState<'room' | 'browsers'>('room');
   const bottom = useRef<HTMLDivElement>(null);
 
-  // The thread follows the run the way a chat follows a conversation.
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [entries.length, view]);
+  }, [entries.length]);
 
   const run = state.run ?? seed.run;
-  const host = strip(run.previewUrl);
-  const baseHost = strip(run.baseUrl);
   const sessions = state.assignments.reduce(
     (n, a) => n + (a.archetype === 'differential' ? 2 : 1),
     0,
   );
-
   const roster = useMemo(() => buildRoster(state), [state]);
-
-  const topFinding =
-    [...state.findings]
-      .filter((f) => f.status === 'confirmed')
-      .sort((a, b) => b.confidence - a.confidence)[0] ?? null;
-  const issue = topFinding ? (state.issues.find((i) => i.findingId === topFinding.id) ?? null) : null;
-
   const runCostMs = state.assignments.reduce(
     (ms, a) => ms + (a.durationMs ?? 0) * (a.archetype === 'differential' ? 2 : 1),
     0,
@@ -63,117 +47,99 @@ export function Room({
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
-      <Sidebar
-        runs={runs}
-        activeRunId={runId}
-        roster={roster}
-        findings={state.findings}
-        runCostMs={runCostMs}
-      />
+      <Sidebar runs={runs} activeRunId={runId} roster={roster} runCostMs={runCostMs} />
 
       <div className="flex min-w-0 flex-1 flex-col bg-stage">
         <RunHeader
           run={run}
           sessions={sessions}
-          view={view}
-          onView={setView}
           replaying={speed > 0 && !state.pullRequest}
           onSkip={() => setSpeed(0)}
           onReplay={() => setSpeed(1)}
         />
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {view === 'browsers' ? (
-            <BrowsersGrid
-              assignments={state.assignments}
-              host={host}
-              baseHost={baseHost}
-              branch={run.commit.branch}
-              baseBranch={run.baseBranch ?? 'base'}
-              maxConcurrent={maxConcurrent}
-            />
-          ) : (
-            <div className="flex min-w-0 flex-1 flex-col gap-[17px] overflow-y-auto px-[26px] pt-5">
-              {entries.map((e) => {
-                switch (e.kind) {
-                  case 'system':
-                    return <SystemLine key={e.id} text={e.text} />;
-                  case 'handoff':
-                    return <Handoff key={e.id} {...e} />;
-                  case 'waiting':
-                    return <Waiting key={e.id} bot={e.bot} text={e.text} />;
-                  case 'message':
-                    return <Message key={e.id} {...e} host={host} />;
-                }
-              })}
-              <div ref={bottom} className="mt-auto">
-                <Composer runId={runId} />
-              </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* Capped and centred: the thread is prose, and prose past ~80
+              characters a line stops being readable however wide the screen. */}
+          <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col gap-[17px] px-6 pt-6">
+            {entries.map((e) => {
+              switch (e.kind) {
+                case 'system':
+                  return <SystemLine key={e.id} text={e.text} />;
+                case 'handoff':
+                  return <Handoff key={e.id} {...e} />;
+                case 'browsers':
+                  return <BrowsersRow key={e.id} feeds={e.feeds} note={e.note} />;
+                case 'typing':
+                  return <Typing key={e.id} bot={e.bot} verb={e.verb} />;
+                case 'message':
+                  return <Message key={e.id} {...e} />;
+              }
+            })}
+            <div ref={bottom} className="mt-auto">
+              <Composer runId={runId} />
             </div>
-          )}
-
-          <IssueRail
-            finding={topFinding}
-            issue={issue}
-            assignments={state.assignments}
-            diagnosis={state.diagnosis}
-            patch={state.patch}
-            verification={state.verification}
-            pullRequest={state.pullRequest}
-            sha={run.commit.sha}
-          />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/** Sidebar roster status, entirely derived from pipeline state. */
+/** Rail status, entirely derived from pipeline state. */
 function buildRoster(s: ReturnType<typeof useRunStream>['state']): Record<BotId, RosterStatus> {
-  const idle = (text: string): RosterStatus => ({ text, tone: 'idle' });
-  const live = (text: string): RosterStatus => ({ text, tone: 'live' });
-  const bad = (text: string): RosterStatus => ({ text, tone: 'bad' });
+  const verb = (b: BotId) => BOTS[b].doing[0]!;
+  const idle = (line = 'waiting'): RosterStatus => ({ line, tone: 'idle' });
 
   const cast = (archetype: 'conformance' | 'differential'): RosterStatus => {
     const mine = s.assignments.filter((a) => a.archetype === archetype);
-    if (mine.length === 0) return idle('waiting');
-    const running = mine.find((a) => a.status === 'running');
-    if (running) return live(duration(Date.now() - Date.parse(running.startedAt ?? '')));
+    if (mine.length === 0) return idle();
+    const running = mine.filter((a) => a.status === 'running');
+    if (running.length > 0) {
+      const a = running[0]!;
+      return {
+        line:
+          archetype === 'differential'
+            ? 'running both sides'
+            : `${a.assertionId} · step ${a.steps.length}`,
+        tone: 'live',
+      };
+    }
     const failed = mine.filter((a) => a.status === 'failed').length;
-    if (failed > 0) return bad(failed === 1 ? 'found one' : `found ${failed}`);
+    if (failed > 0) return { line: failed === 1 ? 'found one' : `found ${failed}`, tone: 'bad' };
     if (mine.every((a) => a.status === 'queued')) return idle('queued');
-    return { text: `clean · ${duration(mine[0]?.durationMs ?? null)}`, tone: 'idle' };
+    return { line: `clean · ${duration(mine[0]?.durationMs ?? null)}`, tone: 'done' };
   };
 
   const kept = s.findings.filter((f) => f.status === 'confirmed').length;
   const cut = s.findings.length - kept;
 
   return {
-    maestro: s.run?.status === 'complete' ? { text: 'closed the run', tone: 'idle' } : live('open'),
+    maestro: idle(),
     diffany: s.charter
-      ? { text: `${s.charter.assertions.length} assertions`, tone: 'idle' }
-      : live('reading'),
+      ? { line: `${s.charter.assertions.length} assertions written`, tone: 'done' }
+      : { line: verb('diffany'), tone: 'live' },
     qaizen: cast('conformance'),
     doppler: cast('differential'),
     gavel: s.findings.length
-      ? { text: `kept ${kept}, cut ${cut}`, tone: 'idle' }
+      ? { line: `kept ${kept}, cut ${cut}`, tone: 'done' }
       : s.active === 'critic'
-        ? live('weighing')
-        : idle('waiting'),
+        ? { line: verb('gavel'), tone: 'live' }
+        : idle(),
     clueso: s.diagnosis
-      ? { text: s.diagnosis.hypotheses[0]?.confidence.toFixed(2) ?? 'done', tone: 'idle' }
+      ? { line: s.diagnosis.hypotheses[0]?.file ?? 'found it', tone: 'done' }
       : s.active === 'sleuth'
-        ? live('writing')
-        : idle('waiting'),
+        ? { line: verb('clueso'), tone: 'live' }
+        : idle(),
     patchouli: s.patch
-      ? { text: `attempt ${s.patch.attempt}`, tone: 'idle' }
+      ? { line: `patch on attempt ${s.patch.attempt}`, tone: 'done' }
       : s.active === 'understudy'
-        ? live('patching')
-        : idle('waiting'),
+        ? { line: verb('patchouli'), tone: 'live' }
+        : idle(),
     encore: s.verification
-      ? { text: s.verification.passed ? 'verified' : 'sent it back', tone: 'idle' }
+      ? { line: s.verification.passed ? 'verified the fix' : 'sent it back', tone: 'done' }
       : s.active === 'curtain_call'
-        ? live('re-running')
-        : idle('waiting'),
+        ? { line: verb('encore'), tone: 'live' }
+        : idle(),
   };
 }

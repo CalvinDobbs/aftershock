@@ -2,9 +2,11 @@ import type {
   Assignment,
   Diagnosis,
   Finding,
+  Issue,
   Patch,
   PullRequest,
   Run,
+  Step,
   TestCharter,
   Verification,
 } from '@aftershock/schema';
@@ -14,36 +16,53 @@ import { BOTS, BOT_BY_ARCHETYPE, type BotId } from '@/components/bots/registry';
  * The room is a *projection* of the pipeline, not a data source the pipeline
  * has to feed.
  *
- * The backend emits exactly what the PRD specifies — a Test Charter,
- * assignments with reasoning traces, findings, a diagnosis, a patch, a
- * verification. Nothing in it knows this dashboard renders a conversation.
- * Everything below is derived here, client-side.
+ * The backend emits exactly what the PRD specifies. Nothing in it knows this
+ * dashboard renders a conversation. Where a bot speaks, the words come from
+ * `Assignment.trace`, which the PRD already requires every agent to emit;
+ * stages with no trace are composed from their structured output.
  *
- * Where a bot "speaks", the words come from `Assignment.trace`, which the PRD
- * already requires every agent to emit ("Every agent emits a reasoning trace.
- * Stored as structured steps, streamed to the frontend after each stage
- * completes"). Stages with no trace are composed from their structured output.
- * Add a stage to the pipeline and it gets a seat here; change how a stage
- * speaks and nothing else moves.
+ * Maestro has no seat in the rail — the Director is deterministic code, so it
+ * speaks as the room's centred system lines instead.
  */
 
 export type Attachment =
   | { kind: 'assertions'; rows: { id: string; statement: string; source: string }[] }
-  | { kind: 'recording'; assignment: Assignment; finding?: Finding }
+  /** A before/after value readout. Text, because the recording is already above it. */
+  | { kind: 'values'; before: string; after: string; expected?: string; label: string }
   | {
       kind: 'diffpair';
       baseLabel: string;
       headLabel: string;
       rows: { label: string; base: string; head: string; differs: boolean }[];
     }
-  | { kind: 'live'; assignment: Assignment }
   | { kind: 'verdict'; finding: Finding }
   | { kind: 'citation'; assignment: Assignment; stepIdx: number; note: string }
   | { kind: 'patch'; patch: Patch }
-  | { kind: 'verification'; verification: Verification };
+  | { kind: 'verification'; verification: Verification }
+  | {
+      kind: 'issue';
+      issue: Issue;
+      finding?: Finding;
+      verification: Verification | null;
+      /** Everything after the leading issue renders as a single line. */
+      compact: boolean;
+    };
+
+export type FeedItem = {
+  assignmentId: string;
+  bot: BotId;
+  sessionId: string | null;
+  state: 'queued' | 'running' | 'passed' | 'failed' | 'errored';
+  label: string;
+  caption: string;
+  step?: Step;
+  url?: string;
+};
 
 export type RoomEntry =
   | { kind: 'system'; id: string; text: string }
+  /** Every browser in the run, in one row. The Cast made visible. */
+  | { kind: 'browsers'; id: string; feeds: FeedItem[]; note: string }
   | {
       kind: 'message';
       id: string;
@@ -52,18 +71,16 @@ export type RoomEntry =
       role: string;
       body: string;
       attachments: Attachment[];
-      /** Bubble max width, in px. Short asides read better narrow. */
-      max: number;
-      typing?: boolean;
     }
   | { kind: 'handoff'; id: string; from: BotId[]; to: BotId[]; lead: string; tail?: string }
-  | { kind: 'waiting'; id: string; bot: BotId; text: string };
+  | { kind: 'typing'; id: string; bot: BotId; verb: string };
 
 export type RunState = {
   run: Run | null;
   charter: TestCharter | null;
   assignments: Assignment[];
   findings: Finding[];
+  issues: Issue[];
   diagnosis: Diagnosis | null;
   patch: Patch | null;
   verification: Verification | null;
@@ -81,28 +98,44 @@ const clock = (iso: string | null, from: string | undefined) => {
 const lowerFirst = (s: string) => (s ? s[0]!.toLowerCase() + s.slice(1) : s);
 const stripDot = (s: string) => s.replace(/\.\s*$/, '');
 const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
+const list = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`;
+
+export const botFor = (a: Assignment): BotId => BOT_BY_ARCHETYPE[a.archetype];
 
 /**
- * What a bot says about an assignment.
- *
  * An agent's trace is a sequence of decisions, and the last one alone is the
  * conclusion without the observation that earned it. The final two entries are
- * the observation and the verdict, which is the pair a colleague would
- * actually type.
+ * the observation and the verdict — the pair a colleague would actually type.
  */
 const verdictOf = (trace: { content: string }[]) =>
   trace.slice(-2).map((t) => t.content).join(' ');
 
-export const botFor = (a: Assignment): BotId => BOT_BY_ARCHETYPE[a.archetype];
-
-/** The bot that reported a finding, via the assignment that raised it. */
 function reporter(f: Finding, assignments: Assignment[]): BotId {
   const a = assignments.find((x) => f.assignmentIds.includes(x.id));
   return a ? botFor(a) : 'qaizen';
 }
 
-const list = (xs: string[]) =>
-  xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`;
+/** The failing frame and the one before it. */
+function evidencePair(a: Assignment): { before?: Step; after?: Step } {
+  const shot = a.steps.filter((s) => s.digest || s.screenshotUrl);
+  const after = [...shot].reverse().find((s) => !s.ok) ?? shot.at(-1);
+  const before = shot.filter((s) => s.idx < (after?.idx ?? 0)).at(-1);
+  return { before, after };
+}
+
+const valueOf = (s?: Step) => s?.digest?.total?.value;
+
+/** PLACEHOLDER — read out of the agent's step label; see expectedLabel note. */
+const expectedOf = (s?: Step) => s?.label.match(/expected\s+([^)]+?)\)?\s*$/i)?.[1]?.trim();
+
+/** Pick a presence verb deterministically, so it never changes on re-render. */
+function verbFor(bot: BotId, salt: string): string {
+  const v = BOTS[bot].doing;
+  let h = 0;
+  for (const c of salt) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return v[Math.abs(h) % v.length]!;
+}
 
 // --- the projection ---------------------------------------------------------
 
@@ -111,32 +144,29 @@ export function deriveRoom(s: RunState): RoomEntry[] {
   const run = s.run;
   if (!run) return out;
   const t0 = run.startedAt;
+  const host = (run.previewUrl ?? '').replace(/^https?:\/\//, '');
 
   out.push({
     kind: 'system',
     id: 'sys-open',
-    text: `${cap(run.commit.author)} pushed ${run.commit.filesChanged} files. Maestro opened the run.`,
+    text: `${cap(run.commit.author)} pushed ${run.commit.filesChanged} files — ${run.commit.message}`,
   });
 
   // --- Diffany reads the diff ---
   if (s.charter) {
     const c = s.charter;
     const diff = c.assertions.find((a) => a.type === 'differential');
-    const scoutAt = run.stages.find((x) => x.stage === 'scout')?.finishedAt ?? null;
-
     let body = `${cap(run.commit.author)} says this ${lowerFirst(stripDot(c.intent.summary))}. That's ${c.intent.claims.length} things the diff claims are true.`;
     if (diff) {
       body += ` I'm also sending someone down ${lowerFirst(stripDot(diff.journey ?? diff.route))}, against main at the same time — nothing in the diff mentions it, which is exactly why I want it watched.`;
     }
-
     out.push({
       kind: 'message',
       id: 'm-diffany',
       bot: 'diffany',
-      at: clock(scoutAt, t0),
+      at: clock(run.stages.find((x) => x.stage === 'scout')?.finishedAt ?? null, t0),
       role: BOTS.diffany.role,
       body,
-      max: 640,
       attachments: [
         {
           kind: 'assertions',
@@ -150,80 +180,125 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     });
   }
 
-  // --- the Cast is dispatched ---
+  // --- the Cast, as one row of browsers ---
   if (s.assignments.length > 0) {
     const castBots = [...new Set(s.assignments.map(botFor))];
     const sessions = s.assignments.reduce((n, a) => n + (a.archetype === 'differential' ? 2 : 1), 0);
+
     out.push({
       kind: 'handoff',
       id: 'h-cast',
       from: ['diffany'],
       to: castBots,
       lead: `Diffany handed ${s.assignments.length} assignments to`,
-      tail: `· ${s.assignments.length} browsers, ${sessions} sessions`,
+      tail: `· ${sessions} sessions`,
+    });
+
+    const live = s.assignments.filter((a) => a.status === 'running').length;
+    const queued = s.assignments.filter((a) => a.status === 'queued').length;
+    const failed = s.assignments.filter((a) => a.status === 'failed').length;
+    const errored = s.assignments.filter((a) => a.status === 'errored').length;
+
+    const note = (() => {
+      if (live || queued) {
+        const parts = [];
+        if (live) parts.push(`${live} running`);
+        if (queued) parts.push(`${queued} waiting for a slot`);
+        return `${parts.join(', ')} of ${s.assignments.length} · every action screenshotted, every session recorded`;
+      }
+      const tail = [
+        failed ? `${failed} found something` : null,
+        errored ? `${errored} died` : null,
+      ].filter(Boolean);
+      return `${s.assignments.length} sessions${tail.length ? ` · ${tail.join(', ')}` : ' · all clean'}`;
+    })();
+
+    out.push({
+      kind: 'browsers',
+      id: 'browsers',
+      note,
+      feeds: s.assignments.map((a) => {
+        const { after } = evidencePair(a);
+        const state: FeedItem['state'] =
+          a.status === 'running'
+            ? 'running'
+            : a.status === 'failed'
+              ? 'failed'
+              : a.status === 'errored'
+                ? 'errored'
+                : a.status === 'passed'
+                  ? 'passed'
+                  : 'queued';
+        const caption = {
+          running: a.steps.at(-1)?.label ?? 'opening the page',
+          queued: 'waiting for a slot',
+          failed: 'found something',
+          errored: 'session died',
+          passed: 'clean',
+        }[state];
+        return {
+          assignmentId: a.id,
+          bot: botFor(a),
+          sessionId: a.sessionId,
+          state,
+          label:
+            state === 'running'
+              ? `${a.assertionId} · step ${a.steps.length}`
+              : state === 'queued'
+                ? `${a.assertionId} · queued`
+                : `${a.assertionId} · ${a.steps.length} steps`,
+          caption,
+          step: after,
+          url: `${host}${a.route}`,
+        } satisfies FeedItem;
+      }),
     });
   }
 
-  // Passing agents do not take space in the thread — they are visible in the
-  // Browsers view and in the handoff count. Only running and failed agents
-  // speak, which is what keeps the room readable at eight bots.
+  // Passing agents do not speak. They are visible in the browsers row, and a
+  // room where everyone reports in is a room nobody reads.
   const speaking = s.assignments
-    .filter((a) => a.status === 'failed' || a.status === 'running' || a.status === 'errored')
-    .sort((a, b) => Date.parse(a.finishedAt ?? a.startedAt ?? '') - Date.parse(b.finishedAt ?? b.startedAt ?? ''));
+    .filter((a) => a.status === 'failed' || a.status === 'errored')
+    .sort((a, b) => Date.parse(a.finishedAt ?? '') - Date.parse(b.finishedAt ?? ''));
 
   for (const a of speaking) {
     const bot = botFor(a);
     const finding = s.findings.find((f) => f.assignmentIds.includes(a.id));
     const said = verdictOf(a.trace);
+    const { before, after } = evidencePair(a);
 
-    if (a.status === 'running') {
-      out.push({
-        kind: 'message',
-        id: `m-${a.id}`,
-        bot,
-        at: 'live',
-        role: a.archetype === 'differential' ? BOTS.doppler.role : `assertion ${a.assertionId}`,
-        body: said,
-        max: 560,
-        attachments: [{ kind: 'live', assignment: a }],
-        typing: true,
+    const attachments: Attachment[] = [];
+    if (a.archetype === 'differential') {
+      attachments.push({
+        kind: 'diffpair',
+        baseLabel: (run.baseBranch ?? 'base').toUpperCase(),
+        headLabel: run.commit.branch.toUpperCase(),
+        rows: (finding?.deltas ?? [])
+          .filter((d) => d.classification === 'unclaimed' || d.classification === 'claimed')
+          .slice(0, 3)
+          .map((d) => ({
+            label: d.field,
+            base: d.base,
+            head: d.preview,
+            differs: d.classification === 'unclaimed',
+          })),
       });
-      continue;
+    } else if (valueOf(before) && valueOf(after)) {
+      attachments.push({
+        kind: 'values',
+        label: after?.digest?.total?.label ?? 'value',
+        before: valueOf(before)!,
+        after: valueOf(after)!,
+        ...(expectedOf(after) ? { expected: expectedOf(after) } : {}),
+      });
     }
 
-    if (a.status === 'errored') {
-      out.push({
-        kind: 'message',
-        id: `m-${a.id}`,
-        bot,
-        at: clock(a.finishedAt, t0),
-        role: `assertion ${a.assertionId}`,
-        body: said || 'Session died before I could finish. The run carries on without me.',
-        max: 520,
-        attachments: [],
-      });
-      continue;
-    }
-
-    const attachments: Attachment[] =
-      a.archetype === 'differential'
-        ? [
-            {
-              kind: 'diffpair',
-              baseLabel: (run.baseBranch ?? 'base').toUpperCase(),
-              headLabel: run.commit.branch.toUpperCase(),
-              rows: (finding?.deltas ?? [])
-                .filter((d) => d.classification === 'unclaimed' || d.classification === 'claimed')
-                .slice(0, 3)
-                .map((d) => ({
-                  label: d.field,
-                  base: d.base,
-                  head: d.preview,
-                  differs: d.classification === 'unclaimed',
-                })),
-            },
-          ]
-        : [{ kind: 'recording', assignment: a, finding }];
+    // A crashed agent still reports. Partial failure is normal with several
+    // browsers in flight, and a silent gap reads as a bug in the room.
+    const fallback =
+      a.status === 'errored'
+        ? `My session died at step ${a.steps.length} before I could finish ${a.assertionId}. The run carries on without me.`
+        : (finding?.actual ?? '');
 
     out.push({
       kind: 'message',
@@ -231,26 +306,21 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       bot,
       at: clock(a.finishedAt, t0),
       role: a.archetype === 'differential' ? BOTS.doppler.role : `assertion ${a.assertionId}`,
-      body: said || finding?.actual || '',
-      max: 680,
-      attachments,
+      body: said || fallback,
+      attachments: a.status === 'errored' ? [] : attachments,
     });
   }
 
-  // --- Gavel decides ---
+  // --- Gavel decides, and files ---
   if (s.findings.length > 0) {
     const castBots = [...new Set(s.assignments.filter((a) => a.status === 'failed').map(botFor))];
     const shots = s.assignments.reduce((n, a) => n + a.steps.length, 0);
-    const recordings = s.assignments.reduce(
-      (n, a) => n + (a.sessionId ? 1 : 0) + (a.baseSessionId ? 1 : 0),
-      0,
-    );
     out.push({
       kind: 'handoff',
       id: 'h-critic',
       from: castBots,
       to: ['gavel'],
-      lead: `${list(castBots.map((b) => BOTS[b].name))} passed ${s.findings.length} findings, ${shots} screenshots and ${recordings} recordings to`,
+      lead: `${list(castBots.map((b) => BOTS[b].name))} passed ${s.findings.length} findings and ${shots} screenshots to`,
     });
 
     const kept = s.findings.filter((f) => f.status === 'confirmed');
@@ -266,16 +336,37 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       );
     });
     for (const f of cut) {
-      if (f.status === 'pre_existing') {
-        parts.push(
-          `The ${lowerFirst(f.title)} does the same thing on main, so it isn't a regression and I'm killing it outright.`,
-        );
-      } else {
-        parts.push(
-          `@${BOTS[reporter(f, s.assignments)].name} I'm not filing yours — ${f.reproCount} of ${f.reproAttempts} replays, ${f.confidence.toFixed(2)}.`,
-        );
-      }
+      parts.push(
+        f.status === 'pre_existing'
+          ? `The ${lowerFirst(f.title)} does the same thing on main, so it isn't a regression and I'm killing it outright.`
+          : `@${BOTS[reporter(f, s.assignments)].name} I'm not filing yours — ${f.reproCount} of ${f.reproAttempts} replays, ${f.confidence.toFixed(2)}.`,
+      );
     }
+
+    const attachments: Attachment[] = cut.map((f) => ({ kind: 'verdict', finding: f }) as const);
+
+    // The artefact the product exists to produce, posted when it is real.
+    // Ranked the way the Critic ranks: severity x confidence. Only the leading
+    // issue gets the full card — a second one at full weight buries the first,
+    // and the PRD's own reporting discipline is that a tool which opens a pile
+    // of issues gets muted.
+    const RANK = { critical: 4, high: 3, medium: 2, low: 1 } as const;
+    const score = (i: Issue) => {
+      const f = s.findings.find((x) => x.id === i.findingId);
+      return f ? RANK[f.severity] * f.confidence : 0;
+    };
+    [...s.issues]
+      .sort((a, b) => score(b) - score(a))
+      .forEach((issue, i) => {
+        const finding = s.findings.find((f) => f.id === issue.findingId);
+        attachments.push({
+          kind: 'issue',
+          issue,
+          ...(finding ? { finding } : {}),
+          verification: s.verification,
+          compact: i > 0,
+        });
+      });
 
     out.push({
       kind: 'message',
@@ -284,8 +375,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       at: clock(run.stages.find((x) => x.stage === 'critic')?.finishedAt ?? null, t0),
       role: BOTS.gavel.role,
       body: parts.join(' '),
-      max: 660,
-      attachments: cut.map((f) => ({ kind: 'verdict', finding: f }) as const),
+      attachments,
     });
   }
 
@@ -308,14 +398,13 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       at: clock(run.stages.find((x) => x.stage === 'sleuth')?.finishedAt ?? null, t0),
       role: BOTS.clueso.role,
       body,
-      max: 660,
       attachments: cited
         ? [
             {
               kind: 'citation',
               assignment: cited,
               stepIdx: failingStep,
-              note: `The same frame ${BOTS[botFor(cited)].name} posted, not a copy of it. Every screenshot in this run has one home.`,
+              note: `The same frame ${BOTS[botFor(cited)].name} captured, not a copy of it.`,
             },
           ]
         : [],
@@ -335,8 +424,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       bot: 'patchouli',
       at: clock(run.stages.find((x) => x.stage === 'understudy')?.finishedAt ?? null, t0),
       role: BOTS.patchouli.role,
-      body: `@Clueso's first suspect was right. Smallest thing that satisfies the checklist: ${files} file, +${plus} −${minus}. No tests touched, nothing renamed, no new dependencies. Branch is \`${s.patch.branch}\`.`,
-      max: 660,
+      body: `@Clueso's first suspect was right. Smallest thing that satisfies the checklist: ${files} file, +${plus} −${minus}. No tests touched, nothing renamed, no new dependencies.`,
       attachments: [{ kind: 'patch', patch: s.patch }],
     });
   }
@@ -344,8 +432,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
   // --- Encore verifies ---
   if (s.verification) {
     const v = s.verification;
-    const flipped = v.rows.filter((r) => r.before === 'failed' && r.after === 'passed');
-    const head = flipped[0];
+    const head = v.rows.find((r) => r.before === 'failed' && r.after === 'passed');
     const body = head
       ? `Replayed the exact Actions, no new planning, so this is the same test that failed. ${head.label.split('·').at(-1)?.trim()} read ${head.beforeValue} and now reads ${head.afterValue}.${v.regressionSuitePassed ? ' The differential suite against main is still clean, so the patch did not trade one regression for another.' : ' The differential suite is not clean — sending it back.'}`
       : 'Replayed the failing assignments against the patch.';
@@ -357,40 +444,32 @@ export function deriveRoom(s: RunState): RoomEntry[] {
       at: clock(run.stages.find((x) => x.stage === 'curtain_call')?.finishedAt ?? null, t0),
       role: BOTS.encore.role,
       body,
-      max: 680,
       attachments: [{ kind: 'verification', verification: v }],
     });
   }
 
-  // --- Maestro closes ---
   if (s.pullRequest) {
     const pr = s.pullRequest;
     out.push({
-      kind: 'message',
-      id: 'm-maestro-pr',
-      bot: 'maestro',
-      at: clock(run.finishedAt, t0),
-      role: BOTS.maestro.role,
-      body: `PR #${pr.number} is open against \`${pr.baseBranch}\`, closing #${pr.closesIssue}, labelled ${pr.labels.join(', ')}. Both recordings are attached — the broken one and the fixed one. Maya never opened a browser.`,
-      max: 620,
-      attachments: [],
+      kind: 'system',
+      id: 'sys-pr',
+      text: `Maestro opened #${pr.number} against ${pr.baseBranch}, closing #${pr.closesIssue}. ${cap(run.commit.author)} never opened a browser.`,
     });
   }
 
-  // --- who the room is waiting on ---
   const next = nextWaiting(s);
-  if (next) out.push({ kind: 'waiting', id: 'w', bot: next.bot, text: next.text });
+  if (next) out.push({ kind: 'typing', id: 'typing', bot: next, verb: verbFor(next, run.id) });
 
   return out;
 }
 
-function nextWaiting(s: RunState): { bot: BotId; text: string } | null {
+function nextWaiting(s: RunState): BotId | null {
   if (!s.run || s.run.status === 'complete' || s.run.status === 'failed') return null;
-  if (!s.charter) return { bot: 'diffany', text: 'Diffany is reading the diff' };
+  if (!s.charter) return 'diffany';
   if (s.assignments.some((a) => a.status === 'queued' || a.status === 'running')) return null;
-  if (s.findings.length === 0) return { bot: 'gavel', text: 'Gavel is weighing the findings' };
-  if (!s.diagnosis) return { bot: 'clueso', text: 'Clueso is reading the log' };
-  if (!s.patch) return { bot: 'patchouli', text: 'Patchouli is waiting for the hypothesis' };
-  if (!s.verification) return { bot: 'encore', text: 'Encore is waiting for a preview of the patch' };
+  if (s.findings.length === 0) return 'gavel';
+  if (!s.diagnosis) return 'clueso';
+  if (!s.patch) return 'patchouli';
+  if (!s.verification) return 'encore';
   return null;
 }

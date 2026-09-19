@@ -26,21 +26,29 @@ Three layouts exist in the source:
 
 | Ref | Name | Where it lives in the app |
 | --- | --- | --- |
-| 2a | The run, as a thread every bot is in | `/runs/[runId]` — sidebar + thread + issue rail |
+| 2a | The run, as a thread every bot is in | `/runs/[runId]` — rail + thread |
 | 2b | A handoff, close up | the `Handoff` divider inside the thread |
-| 2c | Six sessions at once | the **Browsers** view, toggled from the run header |
+| 2c | Six sessions at once | the browsers row, inline in the thread |
+
+Two departures from the source, both simplifications:
+
+- **No right-hand issue rail.** It reserved a third of the screen for an
+  artefact that does not exist for most of a run. Gavel posts the issue into
+  the thread when it files it, and the fix checklist ticks in place as Encore
+  verifies — one object, not two views of it.
+- **No separate Browsers view.** The sessions are the most persuasive thing
+  the product does, so they sit in the conversation rather than a click away.
 
 ---
 
 ## The cast
 
-The design draws **eleven** bots. Aftershock ships **eight**. The three cuts
-follow the PRD's own pre-agreed cut order (*Scope > The cut order*) rather than
-taste, so the decision is defensible on stage.
+The design draws **eleven** bots. Aftershock ships **seven** in the rail.
+Three cuts follow the PRD's own pre-agreed cut order (*Scope > The cut order*)
+rather than taste; Maestro is demoted rather than cut.
 
 | Bot | Role | PRD stage | Fill | Face ink | Period |
 | --- | --- | --- | --- | --- | --- |
-| Maestro | runs the room, writes to GitHub | Director | `#8a8a8a` | `#2a2a2a` | 9.4s |
 | Diffany | turns the diff into claims | Scout | `#d6a13c` | `#3d2c0c` | 7.2s |
 | QAizen | checks a claim start to finish | Cast · conformance | `#4fae7a` | `#0f2e1e` | 6.1s |
 | Doppler | runs your branch against main | Cast · differential | `#5b8fd6` | `#12243a` | 7.7s |
@@ -48,6 +56,14 @@ taste, so the decision is defensible on stage.
 | Clueso | reads the log, then the code | Sleuth | `#4f9fd6` | `#0e2439` | 7s |
 | Patchouli | writes the smallest patch | Understudy | `#68b55f` | `#0f2c0c` | 7.9s |
 | Encore | re-runs the same browsers | Curtain Call | `#b58a5f` | `#33220f` | 8.5s |
+
+### Demoted
+
+**Maestro** (`#8a8a8a` / `#2a2a2a` / 9.4s) is the Director, which is
+deterministic code rather than an agent. It speaks as the room's centred
+system lines and still appears as the avatar on a failed run, but it holds no
+rail row — a roster is a list of things you can be waiting on, and the
+Director is never what you are waiting for.
 
 ### Cut
 
@@ -83,9 +99,15 @@ marker), QAizen three bars (assertions in a row), Doppler two rings (two
 sessions), Clueso a magnifier, Gavel a hammer, Encore two curtain bars.
 Grins are always eyes-plus-mouth. Clueso's grin winks.
 
-Avatars render **unanimated** in dense contexts — past runs in the sidebar,
-inline handoff chips, attachment headers — and animated where a bot is present:
-the active run, the roster, message gutters.
+Avatars render **unanimated** in dense contexts — past runs in the rail,
+inline handoff chips, attachment headers — and animated where a bot is
+present: the roster and message gutters. A waiting bot keeps blinking; freezing
+its face reads as the room being switched off, so waiting is carried by opacity
+and a status dot instead.
+
+Each rail row carries a **status line** in the bot's own voice — *is reading
+the diff*, *is cooking*, *A1 · step 4*. A stage that takes twenty seconds then
+reads as someone working rather than as a spinner.
 
 ---
 
@@ -198,31 +220,35 @@ then `#4a2018` as the run approaches the failing step.
 ## Layout
 
 ```
-┌─ 292px ────┬─ flex ─────────────────────┬─ 400px ──────┐
-│ sidebar    │ run header                 │ issue rail   │
-│ #101010    ├────────────────────────────┤ #111111      │
-│            │                            │              │
-│ runs       │ thread                     │ Issue #143   │
-│ ON THIS RUN│  system line               │  what should │
-│  roster    │  message + attachments     │  what does   │
-│ WHAT THE   │  ── handoff ──             │  evidence    │
-│ ROOM       │  message                   │  reproduction│
-│ REMEMBERS  │  typing line               │  suspects    │
-│ BUDGET     │                            │  checklist   │
-│            │ composer                   │  before/after│
-│ user       │                            │  patch       │
-└────────────┴────────────────────────────┴──────────────┘
+┌─ 288px ─────────┬──────────── flex ─────────────────┐
+│ rail   #101010  │ run header                        │
+│                 ├───────────────────────────────────┤
+│ RUNS            │   thread · max 820, centred       │
+│  4 recent       │    ── system line ──              │
+│                 │    [bot] message + attachments    │
+│ IN THE ROOM     │    ┌────────┬────────┬────────┐   │
+│  ● Diffany      │    │ 16:10  │ 16:10  │ 16:10  │   │
+│    6 assertions │    └────────┴────────┴────────┘   │
+│  ● QAizen       │    ── handoff ──                  │
+│    A1 · step 4  │    [bot] is cooking…              │
+│  ○ Gavel        │                                   │
+│    waiting      │   composer                        │
+│ BROWSER BUDGET  │                                   │
+│ user            │                                   │
+└─────────────────┴───────────────────────────────────┘
 ```
 
-The right rail is the GitHub issue **being written live**, attributed
-paragraph by paragraph to the bot that supplied each part — Diffany owns "what
-should happen", QAizen owns "what happens", Gavel owns reproduction and the fix
-checklist, Clueso owns suspect files. Sections for stages that have not run yet
-render dashed and dimmed rather than being absent, so the shape of the finished
-artefact is visible from the start.
+The thread caps at 820px and centres. Prose past roughly 80 characters a line
+stops being readable however wide the window is, and the room is prose.
 
-That attribution is the confidence model made visual: you can see that no
-single agent both found the bug and decided it was one.
+**Evidence appears once.** The browsers row carries the recordings; the message
+that follows carries the argument as values (`$84.00 → $84.00, should read
+$67.20`) rather than repeating the same frames as screenshots. Saying it twice
+doubles the height of every finding and makes neither copy land.
+
+Attribution is the confidence model made visual — Diffany cites the diff for
+what should happen, QAizen reports what did, and only Gavel decides it counts.
+You can see that no single agent both found the bug and judged it.
 
 ---
 
@@ -237,6 +263,10 @@ Five keyframes total. Nothing else moves.
 | `sp` | 1s linear ring spinner inside "Working" pills |
 | `swp` | recording scanline, 3s linear, `translateY(-130% → 1100%)` |
 | `land` | new thread entries rise 8px and fade in over 360ms |
+
+Typing dots are three `bl` spans offset 0.18s apart — the only staggered
+animation in the system, because it is the one place the stagger *is* the
+meaning.
 
 `land` is the only addition to the source, and it exists because the design is
 a still frame while the product streams. Everything respects

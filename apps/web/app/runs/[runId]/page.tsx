@@ -12,11 +12,6 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
   // The server render seeds the commit header so the page is never blank; the
   // stages themselves arrive over SSE and animate in.
   return (
-    <Room
-      runId={runId}
-      seed={detail}
-      runs={runs}
-      maxConcurrent={Number(process.env.MAX_CONCURRENT ?? 6)}
-    />
+    <Room runId={runId} seed={detail} runs={runs} />
   );
 }

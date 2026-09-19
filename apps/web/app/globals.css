@@ -163,6 +163,40 @@
   }
 }
 
+/* Media develops rather than pops: a 1.5% scale settle under a cross-fade, so
+   a screenshot or a recording arriving never shifts the layout or flashes. The
+   box that holds it is always already the right size. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal {
+  animation: reveal 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The placeholder under unloaded media. Deliberately not a shimmer sweep —
+   a sweep is a second moving thing competing with the faces. */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+.breathe {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
 /* Messages land rather than appear. */
 @keyframes land {
   from {

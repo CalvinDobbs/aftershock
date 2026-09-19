@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import type { VisibleDigest } from '@aftershock/schema';
 import clsx from 'clsx';
 
@@ -31,8 +34,7 @@ export function PageShot({
   alt?: string;
 }) {
   if (screenshotUrl) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={screenshotUrl} alt={alt ?? 'step screenshot'} className="block w-full" />;
+    return <Shot src={screenshotUrl} alt={alt ?? 'step screenshot'} />;
   }
 
   if (!digest) {
@@ -141,5 +143,22 @@ export function PageShot({
         </div>
       )}
     </div>
+  );
+}
+
+/** A real screenshot, developed in over its own placeholder. */
+function Shot({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <span className="relative block w-full">
+      {!loaded && <span className="breathe absolute inset-0 block bg-[#e9e9e9]" />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        className={clsx('block w-full', loaded ? 'reveal' : 'opacity-0')}
+      />
+    </span>
   );
 }

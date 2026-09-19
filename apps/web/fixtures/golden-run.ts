@@ -33,6 +33,23 @@ const T0 = Date.parse('2026-09-19T14:02:11Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
 export const RUN_ID = 'run_8f2a';
+
+/**
+ * PLACEHOLDER — real Browserbase recordings, wrong journey.
+ *
+ * These are live session IDs captured against a storefront, so the feeds in
+ * the room play actual video through the replay proxy rather than showing a
+ * dead frame. They are not recordings of *this* commit's journeys. Replace
+ * each with the session the orchestrator actually opened once runs are real;
+ * the ids are the only thing that has to change.
+ */
+const SESSION = {
+  A1: 'eaf251fe-b4f8-40dd-a332-95e63c498ab2',
+  A2: '416eefd1-49a8-4e26-85ed-815e81d86bbe',
+  A3: 'ab5016e0-3a9f-4e42-9c05-3ebacd46d050',
+  D1: 'eaf251fe-b4f8-40dd-a332-95e63c498ab2',
+  D1_BASE: '416eefd1-49a8-4e26-85ed-815e81d86bbe',
+} as const;
 const REPO = 'meridian-labs/meridian';
 
 export const run: Run = {
@@ -132,7 +149,7 @@ const A1: Assignment = {
   route: '/checkout',
   brief: 'Entering coupon SAVE20 reduces the order total by 20 percent',
   status: 'failed',
-  sessionId: 'bb_sess_7c1a9e',
+  sessionId: SESSION.A1,
   baseSessionId: null,
   startedAt: at(19),
   finishedAt: at(60),
@@ -170,7 +187,7 @@ const A2: Assignment = {
   route: '/checkout',
   brief: 'An invalid coupon shows an error and leaves the total unchanged',
   status: 'passed',
-  sessionId: 'bb_sess_3d40f2',
+  sessionId: SESSION.A2,
   baseSessionId: null,
   startedAt: at(19),
   finishedAt: at(52),
@@ -200,7 +217,7 @@ const A3: Assignment = {
   route: '/checkout',
   brief: 'A coupon input appears on the checkout page and nowhere else',
   status: 'passed',
-  sessionId: 'bb_sess_91ba07',
+  sessionId: SESSION.A3,
   baseSessionId: null,
   startedAt: at(19),
   finishedAt: at(58),
@@ -228,8 +245,8 @@ const D1: Assignment = {
   route: '/cart',
   brief: 'Add two items to cart, open cart, proceed to checkout, complete order with no coupon',
   status: 'failed',
-  sessionId: 'bb_sess_a20c5d',
-  baseSessionId: 'bb_sess_a20c5e',
+  sessionId: SESSION.D1,
+  baseSessionId: SESSION.D1_BASE,
   startedAt: at(19),
   finishedAt: at(97),
   durationMs: 78_000,

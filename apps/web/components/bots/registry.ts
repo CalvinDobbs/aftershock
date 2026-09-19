@@ -3,16 +3,20 @@ import type { Stage } from '@aftershock/schema';
 /**
  * The room.
  *
- * The Claude Design source draws eleven bots. Three are cut here, in the order
- * the PRD's own cut list says to cut them (Scope > The cut order):
+ * The Claude Design source draws eleven bots. Four do not get a seat:
  *
- *   Havoc   — adversary agents        cut #1, P2
- *   Wanda   — explorer agents         cut #3, P1
- *   Nitpick — extra edge-case Cast member, redundant once Havoc is gone
+ *   Havoc   — adversary agents   cut #1 in the PRD's own cut order, P2
+ *   Wanda   — explorer agents    cut #3, P1
+ *   Nitpick — a second edge-case Cast member, redundant once Havoc is gone
+ *   Maestro — the Director, which is deterministic code rather than an agent.
+ *             It speaks as the room's system lines instead of occupying a row,
+ *             because a roster is a list of things that can be waited on and
+ *             the Director is never what you are waiting for.
  *
- * What is left is exactly the PRD's seven roles, with the Cast split into its
- * two P0 archetypes. Every bot below is load-bearing: remove any one and a
- * stage of the pipeline has nobody in it.
+ * Seven remain and every one is load-bearing: remove any and a stage of the
+ * pipeline has nobody in it. QAizen and Doppler stay separate because they are
+ * the two oracles — collapsing them costs the side-by-side preview/base shot,
+ * which is the one frame that explains the differential oracle unaided.
  */
 
 export type BotId =
@@ -41,6 +45,13 @@ export type Bot = {
   say: string;
   /** Face cross-fade period. Every bot differs so the room never blinks together. */
   dur: string;
+  /**
+   * What this bot is doing while you wait on it, in its own voice. The room
+   * shows one of these under the name in the rail and as a typing line in the
+   * thread, so a stage that takes twenty seconds still reads as someone
+   * working rather than a spinner.
+   */
+  doing: string[];
 };
 
 export const BOTS: Record<BotId, Bot> = {
@@ -54,6 +65,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#2a2a2a',
     say: '#b4b4b4',
     dur: '9.4s',
+    doing: ['is opening the run', 'is writing it up'],
   },
   diffany: {
     id: 'diffany',
@@ -65,6 +77,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#3d2c0c',
     say: '#e3c07f',
     dur: '7.2s',
+    doing: ['is reading the diff', 'is cooking up assertions'],
   },
   qaizen: {
     id: 'qaizen',
@@ -76,6 +89,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#0f2e1e',
     say: '#7fd3a3',
     dur: '6.1s',
+    doing: ['is clicking through it', 'is running it back'],
   },
   doppler: {
     id: 'doppler',
@@ -87,6 +101,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#12243a',
     say: '#8fb4e8',
     dur: '7.7s',
+    doing: ['is running both sides', 'is diffing the snapshots'],
   },
   gavel: {
     id: 'gavel',
@@ -98,6 +113,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#3d1410',
     say: '#eda08f',
     dur: '8.8s',
+    doing: ['is weighing it', 'is cooking'],
   },
   clueso: {
     id: 'clueso',
@@ -109,6 +125,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#0e2439',
     say: '#8fc4ea',
     dur: '7s',
+    doing: ['is reading the log', 'is in the codebase'],
   },
   patchouli: {
     id: 'patchouli',
@@ -120,6 +137,7 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#0f2c0c',
     say: '#9ad693',
     dur: '7.9s',
+    doing: ['is writing the patch', 'is keeping it small'],
   },
   encore: {
     id: 'encore',
@@ -131,12 +149,15 @@ export const BOTS: Record<BotId, Bot> = {
     ink: '#33220f',
     say: '#d4b795',
     dur: '8.5s',
+    doing: ['is re-running the browsers', 'is checking the fix holds'],
   },
 };
 
-/** Sidebar order — the order they speak in a run. */
+/**
+ * Rail order — the order they speak in a run. Maestro is absent by design: it
+ * is the system voice, not a participant.
+ */
 export const ROSTER: BotId[] = [
-  'maestro',
   'diffany',
   'qaizen',
   'doppler',
@@ -162,6 +183,11 @@ export const BOT_BY_ARCHETYPE = {
   differential: 'doppler',
 } as const satisfies Record<string, BotId>;
 
+/**
+ * @mention colouring covers every bot, not just the rail. Maestro has no rail
+ * row but can still be named in a message, and a mention that renders as plain
+ * text reads as a typo.
+ */
 export const NAME_TO_BOT: Record<string, BotId> = Object.fromEntries(
-  ROSTER.map((id) => [BOTS[id].name.toLowerCase(), id]),
+  (Object.keys(BOTS) as BotId[]).map((id) => [BOTS[id].name.toLowerCase(), id]),
 );
