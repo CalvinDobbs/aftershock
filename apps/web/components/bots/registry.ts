@@ -12,11 +12,19 @@ import type { Stage } from '@aftershock/schema';
  *             It speaks as the room's system lines instead of occupying a row,
  *             because a roster is a list of things that can be waited on and
  *             the Director is never what you are waiting for.
+ *   Encore  — Curtain Call, whose model in the PRD's own cast table is
+ *             "Reuses the Cast". It was never a separate agent: verification
+ *             is the same Actions replayed by the same bots against the fix
+ *             preview. So QAizen and Doppler report their own re-runs, and the
+ *             loop closes on the bot that found the bug saying it is fixed.
  *
- * Seven remain and every one is load-bearing: remove any and a stage of the
+ * Six remain and every one is load-bearing: remove any and a stage of the
  * pipeline has nobody in it. QAizen and Doppler stay separate because they are
  * the two oracles — collapsing them costs the side-by-side preview/base shot,
  * which is the one frame that explains the differential oracle unaided.
+ * Clueso stays separate from Patchouli for the reason the PRD gives: diagnosis
+ * and repair are different skills, and merging them yields patches that fix
+ * the symptom.
  */
 
 export type BotId =
@@ -26,8 +34,7 @@ export type BotId =
   | 'doppler'
   | 'gavel'
   | 'clueso'
-  | 'patchouli'
-  | 'encore';
+  | 'patchouli';
 
 export type Bot = {
   id: BotId;
@@ -139,18 +146,6 @@ export const BOTS: Record<BotId, Bot> = {
     dur: '7.9s',
     doing: ['is writing the patch', 'is keeping it small'],
   },
-  encore: {
-    id: 'encore',
-    name: 'Encore',
-    blurb: 're-runs the same browsers',
-    role: 're-runs the browsers',
-    stage: 'curtain_call',
-    fill: '#b58a5f',
-    ink: '#33220f',
-    say: '#d4b795',
-    dur: '8.5s',
-    doing: ['is re-running the browsers', 'is checking the fix holds'],
-  },
 };
 
 /**
@@ -164,7 +159,6 @@ export const ROSTER: BotId[] = [
   'gavel',
   'clueso',
   'patchouli',
-  'encore',
 ];
 
 export const BOT_BY_STAGE: Record<Stage, BotId> = {
@@ -174,7 +168,8 @@ export const BOT_BY_STAGE: Record<Stage, BotId> = {
   critic: 'gavel',
   sleuth: 'clueso',
   understudy: 'patchouli',
-  curtain_call: 'encore',
+  // Curtain Call is a re-run mode on the Cast, not its own agent.
+  curtain_call: 'qaizen',
 };
 
 /** Which bot runs a given Cast assignment. */

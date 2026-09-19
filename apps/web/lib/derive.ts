@@ -16,13 +16,13 @@ export function lastBot(r: RunSummary): BotId | 'run' {
   if (r.status === 'running' || r.status === 'pending') return 'run';
   if (r.status === 'failed') return 'maestro';
   if (r.status === 'no_findings') return 'doppler';
-  return r.prNumber ? 'encore' : 'gavel';
+  return r.prNumber ? 'patchouli' : 'gavel';
 }
 
 /**
  * One-line preview under a run in the sidebar.
  *
- * PLACEHOLDER — "Encore verified it" is asserted from the presence of a PR.
+ * PLACEHOLDER — "verified" is asserted from the presence of a PR.
  * RunSummary has no verification flag, so a PR opened as a draft marked
  * `aftershock:unverified` reads here as verified, which is the one claim this
  * product must never get wrong. Add `verified: boolean` to RunSummary.
@@ -32,7 +32,7 @@ export function preview(r: RunSummary): string {
   if (r.status === 'running') return 'Diffany is reading the diff…';
   if (r.status === 'failed') return 'run failed — partial results kept';
   if (r.status === 'no_findings') return `nothing to report. ${r.findingsRaised} raised, all discarded`;
-  if (r.prNumber) return `Patchouli opened #${r.prNumber}, Encore verified it`;
+  if (r.prNumber) return `Patchouli opened #${r.prNumber}, re-run came back green`;
   return `${r.findingsConfirmed} filed of ${r.findingsRaised} raised`;
 }
 

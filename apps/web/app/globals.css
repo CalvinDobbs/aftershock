@@ -217,6 +217,22 @@
   animation: bl 1.4s ease-in-out infinite;
 }
 
+/* Hovering a bot makes it react. The face keeps its own ambient rhythm via
+   --face-dur; hovering shortens the cycle so the grin lands within a second
+   instead of whenever it was next due. Driving it through a custom property
+   rather than a second keyframe keeps one animation per face. */
+.bot-face {
+  /* The per-bot period arrives inline as --face-base. It cannot be
+     --face-dur directly: an inline declaration outranks a class rule, so
+     hover could never override it. The stylesheet owns the live value. */
+  --face-dur: var(--face-base, 7s);
+}
+
+.bot-face:hover,
+.bot-face:focus-visible {
+  --face-dur: 1.1s;
+}
+
 .caret {
   animation: bl 1.1s step-end infinite;
 }

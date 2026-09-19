@@ -32,7 +32,7 @@ export function Message({
         </div>
 
         {body && (
-          <div className="pretty rounded-[14px] bg-bubble px-4 py-[13px] text-[15px]/[1.55] text-ink-2">
+          <div className="pretty max-w-[760px] rounded-[14px] bg-bubble px-4 py-[13px] text-[15px]/[1.55] text-ink-2">
             <Say text={body} />
           </div>
         )}

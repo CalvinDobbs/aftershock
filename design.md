@@ -34,8 +34,8 @@ Two departures from the source, both simplifications:
 
 - **No right-hand issue rail.** It reserved a third of the screen for an
   artefact that does not exist for most of a run. Gavel posts the issue into
-  the thread when it files it, and the fix checklist ticks in place as Encore
-  verifies — one object, not two views of it.
+  the thread when it files it, and the fix checklist ticks in place as the
+  Cast re-runs — one object, not two views of it.
 - **No separate Browsers view.** The sessions are the most persuasive thing
   the product does, so they sit in the conversation rather than a click away.
 
@@ -43,9 +43,10 @@ Two departures from the source, both simplifications:
 
 ## The cast
 
-The design draws **eleven** bots. Aftershock ships **seven** in the rail.
+The design draws **eleven** bots. Aftershock ships **six** in the rail.
 Three cuts follow the PRD's own pre-agreed cut order (*Scope > The cut order*)
-rather than taste; Maestro is demoted rather than cut.
+rather than taste; Maestro and Encore are demoted rather than cut, because
+neither is a distinct agent behind the scenes.
 
 | Bot | Role | PRD stage | Fill | Face ink | Period |
 | --- | --- | --- | --- | --- | --- |
@@ -55,7 +56,6 @@ rather than taste; Maestro is demoted rather than cut.
 | Gavel | the only one allowed to file | Critic | `#d6604f` | `#3d1410` | 8.8s |
 | Clueso | reads the log, then the code | Sleuth | `#4f9fd6` | `#0e2439` | 7s |
 | Patchouli | writes the smallest patch | Understudy | `#68b55f` | `#0f2c0c` | 7.9s |
-| Encore | re-runs the same browsers | Curtain Call | `#b58a5f` | `#33220f` | 8.5s |
 
 ### Demoted
 
@@ -65,6 +65,12 @@ system lines and still appears as the avatar on a failed run, but it holds no
 rail row — a roster is a list of things you can be waiting on, and the
 Director is never what you are waiting for.
 
+**Encore** was Curtain Call, and the PRD's own cast table gives its model as
+*"reuses the Cast"* — it was never a separate agent, model or runner, just the
+same Actions replayed against the fix preview. So QAizen and Doppler report
+their own re-runs. The closing beat is better for it: the bot that found the
+bug is the one that says it is gone.
+
 ### Cut
 
 | Bot | Was | Why cut |
@@ -73,9 +79,14 @@ Director is never what you are waiting for.
 | Wanda | explorer agents, no script | Cut order #3. P1, and explorer findings cannot file an issue on their own anyway — they must be promoted by a conformance or differential re-run, so the room can tell that story without a seat at the table. |
 | Nitpick | a second Cast member for edge cases | Redundant once Havoc is gone; its work folds into QAizen's conformance assignments. |
 
-Patchouli and Encore are drawn **static** in the source because they are still
-waiting when the frame was captured. Both are given `idle`/`grin` faces in the
-same idiom so they animate once they have work.
+Patchouli is drawn **static** in the source because it is still waiting when
+the frame was captured. It is given `idle`/`grin` faces in the same idiom so
+it animates once it has work.
+
+**Hovering a bot makes it react.** Each face carries its ambient period in a
+`--face-dur` custom property; hover drops that to 1.1s so the grin lands
+within a second instead of whenever it was next due. One animation per face,
+driven by one property — no second keyframe.
 
 ---
 
@@ -96,7 +107,7 @@ eight characters instead of one animation.
 
 Resting expressions are abstract and job-shaped: Diffany is a triangle (a diff
 marker), QAizen three bars (assertions in a row), Doppler two rings (two
-sessions), Clueso a magnifier, Gavel a hammer, Encore two curtain bars.
+sessions), Clueso a magnifier, Gavel a hammer.
 Grins are always eyes-plus-mouth. Clueso's grin winks.
 
 Avatars render **unanimated** in dense contexts — past runs in the rail,
@@ -238,8 +249,17 @@ then `#4a2018` as the run approaches the failing step.
 └─────────────────┴───────────────────────────────────┘
 ```
 
-The thread caps at 820px and centres. Prose past roughly 80 characters a line
-stops being readable however wide the window is, and the room is prose.
+The column caps at 1080px; speech bubbles inside it cap at 760px. Prose past
+roughly 80 characters a line stops being readable however wide the window is,
+but evidence wants the room, so the two are capped separately.
+
+Browsers run **two abreast**, not three. At three the storefront inside each
+frame stops being legible, and an unreadable browser proves nothing.
+
+The rail collapses to a 60px column that keeps the faces and their status
+dots. A rail that hid them to save 230px would have thrown away the only thing
+it was for. **Runs** and **In the room** each minimise independently, and the
+choice persists.
 
 **Evidence appears once.** The browsers row carries the recordings; the message
 that follows carries the argument as values (`$84.00 → $84.00, should read
@@ -254,7 +274,7 @@ You can see that no single agent both found the bug and judged it.
 
 ## Motion
 
-Five keyframes total. Nothing else moves.
+Seven keyframes total. Nothing else moves.
 
 | Name | Use |
 | --- | --- |
@@ -263,10 +283,21 @@ Five keyframes total. Nothing else moves.
 | `sp` | 1s linear ring spinner inside "Working" pills |
 | `swp` | recording scanline, 3s linear, `translateY(-130% → 1100%)` |
 | `land` | new thread entries rise 8px and fade in over 360ms |
+| `reveal` | media develops in: cross-fade under a 1.5% scale settle, 460ms |
+| `breathe` | the placeholder under unloaded media — deliberately not a sweep |
 
 Typing dots are three `bl` spans offset 0.18s apart — the only staggered
 animation in the system, because it is the one place the stagger *is* the
 meaning.
+
+Media never pops. A recording reveals on its first **decoded** frame, not on
+attach; attaching only means the request went out, and showing the element
+then gives a black flash. The 16:10 box is the same height before and after,
+so nothing reflows as feeds arrive at different moments.
+
+A full run replays in about a minute. The gap between a stage starting and
+completing is where the room shows who is working, so those gaps are long
+enough to read the message that just landed and notice the next bot start.
 
 `land` is the only addition to the source, and it exists because the design is
 a still frame while the product streams. Everything respects

@@ -160,7 +160,7 @@ export function Feed({
 
         {url && (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-1.5 bg-gradient-to-b from-black/70 to-transparent px-2.5 py-1.5">
-            <span className="mono truncate text-[9px]/[1.4] text-white/70">{url}</span>
+            <span className="mono truncate text-[10px]/[1.4] text-white/75">{url}</span>
             {state === 'running' && (
               <>
                 <span className="flex-1" />
@@ -172,11 +172,11 @@ export function Feed({
         )}
       </div>
 
-      <figcaption className="mt-2 flex items-baseline gap-2">
+      <figcaption className="mt-2.5 flex items-baseline gap-2">
         {state === 'running' ? <Spinner size={9} /> : null}
         <span
           className={clsx(
-            'mono shrink-0 text-[10.5px]/[1]',
+            'mono shrink-0 text-[11.5px]/[1]',
             flagged
               ? 'text-alarm'
               : state === 'running'
@@ -188,7 +188,7 @@ export function Feed({
         >
           {label}
         </span>
-        <span className="truncate text-[11.5px]/[1.4] text-ink-8">{caption}</span>
+        <span className="truncate text-[12.5px]/[1.4] text-ink-8">{caption}</span>
       </figcaption>
     </figure>
   );

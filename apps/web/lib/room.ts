@@ -9,6 +9,7 @@ import type {
   Step,
   TestCharter,
   Verification,
+  VerificationRow,
 } from '@aftershock/schema';
 import { BOTS, BOT_BY_ARCHETYPE, type BotId } from '@/components/bots/registry';
 
@@ -429,23 +430,42 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     });
   }
 
-  // --- Encore verifies ---
+  // --- the Cast re-runs its own work against the fix ---
+  //
+  // Curtain Call is not a separate agent; the PRD's cast table gives its model
+  // as "reuses the Cast". So the bot that ran an assignment is the one that
+  // says whether the patch fixed it, which also makes the closing beat the
+  // bot that found the bug confirming it is gone.
   if (s.verification) {
     const v = s.verification;
-    const head = v.rows.find((r) => r.before === 'failed' && r.after === 'passed');
-    const body = head
-      ? `Replayed the exact Actions, no new planning, so this is the same test that failed. ${head.label.split('·').at(-1)?.trim()} read ${head.beforeValue} and now reads ${head.afterValue}.${v.regressionSuitePassed ? ' The differential suite against main is still clean, so the patch did not trade one regression for another.' : ' The differential suite is not clean — sending it back.'}`
-      : 'Replayed the failing assignments against the patch.';
+    const at = clock(run.stages.find((x) => x.stage === 'curtain_call')?.finishedAt ?? null, t0);
 
-    out.push({
-      kind: 'message',
-      id: 'm-encore',
-      bot: 'encore',
-      at: clock(run.stages.find((x) => x.stage === 'curtain_call')?.finishedAt ?? null, t0),
-      role: BOTS.encore.role,
-      body,
-      attachments: [{ kind: 'verification', verification: v }],
-    });
+    const byBot = new Map<BotId, VerificationRow[]>();
+    for (const r of v.rows) {
+      const a = s.assignments.find((x) => x.id === r.assignmentId);
+      const bot = a ? botFor(a) : 'qaizen';
+      byBot.set(bot, [...(byBot.get(bot) ?? []), r]);
+    }
+
+    for (const [bot, rows] of byBot) {
+      const flipped = rows.find((r) => r.before === 'failed' && r.after === 'passed');
+      const ids = list(rows.map((r) => r.assignmentId));
+
+      const body =
+        bot === 'doppler'
+          ? `Re-ran both sides against the patch preview, same Actions as before. ${flipped?.beforeValue ?? 'the delta'} is now ${flipped?.afterValue ?? 'gone'}.${v.regressionSuitePassed ? ' Nothing else differs from main either, so the fix did not trade one regression for another.' : ' Something else differs now — sending it back.'}`
+          : `Replayed ${ids} against the patch preview. Same Action sequence, no new planning, so this is the same test that failed. ${flipped?.beforeValue ?? '—'} before, ${flipped?.afterValue ?? '—'} now.`;
+
+      out.push({
+        kind: 'message',
+        id: `m-verify-${bot}`,
+        bot,
+        at,
+        role: 're-run against the fix',
+        body,
+        attachments: [{ kind: 'verification', verification: { ...v, rows } }],
+      });
+    }
   }
 
   if (s.pullRequest) {
@@ -470,6 +490,6 @@ function nextWaiting(s: RunState): BotId | null {
   if (s.findings.length === 0) return 'gavel';
   if (!s.diagnosis) return 'clueso';
   if (!s.patch) return 'patchouli';
-  if (!s.verification) return 'encore';
+  if (!s.verification) return 'qaizen';
   return null;
 }

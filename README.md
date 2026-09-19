@@ -50,8 +50,7 @@ and, once it exists, `AFTERSHOCK_API_URL`.
 
 ## The room
 
-A run is a thread every bot is in. Seven bots in the rail, one per pipeline
-stage:
+A run is a thread every bot is in. Six bots in the rail:
 
 | Bot | Stage | Job |
 | --- | --- | --- |
@@ -61,10 +60,11 @@ stage:
 | Gavel | Critic | the only one allowed to file |
 | Clueso | Sleuth | reads the log, then the code |
 | Patchouli | Understudy | writes the smallest patch |
-| Encore | Curtain Call | re-runs the same browsers |
 
 **Maestro** (the Director) has no rail row — it is deterministic code, so it
-speaks as the room's centred system lines. The Claude Design source draws
+speaks as the room's centred system lines. **Curtain Call** has no bot either:
+the PRD gives its model as "reuses the Cast", so QAizen and Doppler replay
+their own Actions against the fix preview and report the result themselves. The Claude Design source draws
 eleven bots; Havoc, Wanda and Nitpick were cut in the PRD's own pre-agreed cut
 order. See [design.md](design.md#the-cast).
 
@@ -90,7 +90,7 @@ Assignment.trace     -> what QAizen and Doppler say, verbatim
 Assignment.steps     -> the recording card, the screenshot strip, the diff panes
 Finding + modifiers  -> Gavel's verdict and the discarded-finding ledger
 Diagnosis            -> Clueso's message and the suspect-file rail card
-Patch / Verification -> Patchouli's diff, Encore's before-and-after
+Patch / Verification -> Patchouli's diff, the Cast re-run's before-and-after
 ```
 
 So: **give an agent a good reasoning trace and it speaks well.** The PRD already
@@ -184,7 +184,7 @@ grep -rn "PLACEHOLDER" apps/web --include='*.ts' --include='*.tsx'
 Each marker says what the real source is and, where it matters, which schema
 field is missing. The two worth fixing first:
 
-- **`lib/derive.ts`** — the sidebar infers "Encore verified it" from a PR
+- **`lib/derive.ts`** — the sidebar infers "the Cast re-run verified it" from a PR
   existing. A draft PR marked `aftershock:unverified` would read as verified,
   which is the one claim this product cannot get wrong. Needs
   `RunSummary.verified`.

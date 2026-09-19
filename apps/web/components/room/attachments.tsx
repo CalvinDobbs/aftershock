@@ -8,6 +8,7 @@ import { BOTS } from '@/components/bots/registry';
 import { BrowserFrame } from '@/components/ui/BrowserFrame';
 import { PageShot } from '@/components/ui/PageShot';
 import { IssueCard } from './IssueCard';
+import { PatchCard } from './PatchCard';
 
 export function Attachments({ items }: { items: Attachment[] }) {
   return (
@@ -227,36 +228,7 @@ function Citation({
   );
 }
 
-// --- Patchouli's diff -------------------------------------------------------
-
-export function PatchCard({ diff, branch }: { diff: string; branch?: string }) {
-  const lines = diff.split('\n').filter((l) => !/^(diff --git|index |--- |\+\+\+ )/.test(l));
-  return (
-    <div className="mt-[9px] rounded-[13px] bg-card px-[13px] py-3">
-      <div className="mono overflow-x-auto rounded-[8px] bg-shot px-3 py-2.5 text-[11.5px]/[1.7]">
-        {lines.map((l, i) => (
-          <div
-            key={i}
-            className={
-              l.startsWith('+')
-                ? 'text-plus'
-                : l.startsWith('-')
-                  ? 'text-minus'
-                  : l.startsWith('@@')
-                    ? 'text-ink-8'
-                    : 'text-ink-7'
-            }
-          >
-            {l || ' '}
-          </div>
-        ))}
-      </div>
-      {branch && <div className="mono mt-[9px] text-[11px]/[1.5] text-ink-8">{branch}</div>}
-    </div>
-  );
-}
-
-// --- Encore's before and after ----------------------------------------------
+// --- before and after, per re-run assignment ----------------------------------------------
 
 function VerificationCard({
   rows,

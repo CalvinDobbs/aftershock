@@ -59,9 +59,10 @@ export function Room({
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Capped and centred: the thread is prose, and prose past ~80
-              characters a line stops being readable however wide the screen. */}
-          <div className="mx-auto flex min-h-full w-full max-w-[820px] flex-col gap-[17px] px-6 pt-6">
+          {/* The column is wide enough for evidence; the speech bubbles inside
+              it are capped separately, because prose past ~80 characters a line
+              stops being readable however wide the window is. */}
+          <div className="mx-auto flex min-h-full w-full max-w-[1080px] flex-col gap-[19px] px-6 pt-6">
             {entries.map((e) => {
               switch (e.kind) {
                 case 'system':
@@ -94,6 +95,19 @@ function buildRoster(s: ReturnType<typeof useRunStream>['state']): Record<BotId,
   const cast = (archetype: 'conformance' | 'differential'): RosterStatus => {
     const mine = s.assignments.filter((a) => a.archetype === archetype);
     if (mine.length === 0) return idle();
+
+    // The Cast owns verification too — Curtain Call is these same bots
+    // replaying their own Actions against the fix preview.
+    if (s.verification) {
+      const ids = new Set(mine.map((a) => a.id));
+      const rows = s.verification.rows.filter((r) => ids.has(r.assignmentId));
+      if (rows.length > 0) {
+        const green = rows.every((r) => r.after === 'passed');
+        return { line: green ? `re-ran ${rows.length}, green` : 'still red', tone: green ? 'done' : 'bad' };
+      }
+    }
+    if (s.active === 'curtain_call') return { line: verb(archetype === 'differential' ? 'doppler' : 'qaizen'), tone: 'live' };
+
     const running = mine.filter((a) => a.status === 'running');
     if (running.length > 0) {
       const a = running[0]!;
@@ -135,11 +149,6 @@ function buildRoster(s: ReturnType<typeof useRunStream>['state']): Record<BotId,
       ? { line: `patch on attempt ${s.patch.attempt}`, tone: 'done' }
       : s.active === 'understudy'
         ? { line: verb('patchouli'), tone: 'live' }
-        : idle(),
-    encore: s.verification
-      ? { line: s.verification.passed ? 'verified the fix' : 'sent it back', tone: 'done' }
-      : s.active === 'curtain_call'
-        ? { line: verb('encore'), tone: 'live' }
         : idle(),
   };
 }

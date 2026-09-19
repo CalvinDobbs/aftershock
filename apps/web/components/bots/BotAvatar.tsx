@@ -94,10 +94,9 @@ function faces(ink: string): Record<BotId, Face> {
         </>
       ),
     },
-    // Drawn static in the design source because both are still waiting when the
-    // frame was captured. Given faces in the same idiom so they animate once
-    // they have work: Patchouli keeps the plus as a mouth, Encore's curtain
-    // bars part into eyes.
+    // Drawn static in the design source because Patchouli is still waiting
+    // when the frame was captured. Given a face in the same idiom so it
+    // animates once it has work: the plus becomes the mouth.
     patchouli: {
       idle: <path d="M20 13v14M13 20h14" {...S} strokeWidth="2.6" />,
       grin: (
@@ -105,16 +104,6 @@ function faces(ink: string): Record<BotId, Face> {
           <circle cx="15.5" cy="17.5" r="2.2" fill={ink} />
           <circle cx="24.5" cy="17.5" r="2.2" fill={ink} />
           <path d="M20 21.5v5M17.5 24h5" {...S} strokeWidth="2.4" />
-        </>
-      ),
-    },
-    encore: {
-      idle: <path d="M15.5 13v14M24.5 13v14" {...S} strokeWidth="2.8" />,
-      grin: (
-        <>
-          <rect x="13.8" y="15" width="3.4" height="5" rx="1.7" fill={ink} />
-          <rect x="22.8" y="15" width="3.4" height="5" rx="1.7" fill={ink} />
-          <path d="M14 23.5c2.5 3 9.5 3 12 0" {...S} strokeWidth="2.6" />
         </>
       ),
     },
@@ -145,8 +134,8 @@ export function BotAvatar({
       fill="none"
       role="img"
       aria-label={b.name}
-      className={className}
-      style={{ flex: 'none', ...style }}
+      className={animate ? `bot-face ${className ?? ''}` : className}
+      style={{ flex: 'none', ...(animate ? { ['--face-base' as string]: b.dur } : {}), ...style }}
     >
       <circle cx="20" cy="20" r="20" fill={b.fill} />
       {animate ? (
@@ -155,8 +144,12 @@ export function BotAvatar({
               declaration, but when prefers-reduced-motion collapses the
               animation both groups fall back to these values. Without them
               the grin renders on top of the resting face. */}
-          <g style={{ opacity: 1, animation: `idle ${b.dur} ease-in-out infinite` }}>{face.idle}</g>
-          <g style={{ opacity: 0, animation: `grin ${b.dur} ease-in-out infinite` }}>{face.grin}</g>
+          <g style={{ opacity: 1, animation: 'idle var(--face-dur) ease-in-out infinite' }}>
+            {face.idle}
+          </g>
+          <g style={{ opacity: 0, animation: 'grin var(--face-dur) ease-in-out infinite' }}>
+            {face.grin}
+          </g>
         </>
       ) : (
         <g>{face.idle}</g>
@@ -189,13 +182,18 @@ export function RunMark({ size = 26, animate = true }: { size?: number; animate?
       fill="none"
       role="img"
       aria-label="Aftershock run"
-      style={{ flex: 'none' }}
+      className={animate ? 'bot-face' : undefined}
+      style={{ flex: 'none', ...(animate ? { ['--face-base' as string]: '6.8s' } : {}) }}
     >
       <circle cx="20" cy="20" r="20" fill="#e8a33d" />
       {animate ? (
         <>
-          <g style={{ opacity: 1, animation: 'idle 6.8s ease-in-out infinite' }}>{idle}</g>
-          <g style={{ opacity: 0, animation: 'grin 6.8s ease-in-out infinite' }}>{grin}</g>
+          <g style={{ opacity: 1, animation: 'idle var(--face-dur) ease-in-out infinite' }}>
+            {idle}
+          </g>
+          <g style={{ opacity: 0, animation: 'grin var(--face-dur) ease-in-out infinite' }}>
+            {grin}
+          </g>
         </>
       ) : (
         <g>{idle}</g>

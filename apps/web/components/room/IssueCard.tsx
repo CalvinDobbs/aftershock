@@ -9,7 +9,7 @@ import type { Finding, Issue, Verification } from '@aftershock/schema';
  * It used to live in a permanent right-hand column, which meant the product's
  * output artefact occupied a third of the screen for the whole run before it
  * existed. Here it arrives when it is real, and the checklist ticks in place
- * as Encore verifies each item — so the card is the same object the whole way
+ * as the Cast re-runs each item — so the card is the same object the whole way
  * through rather than two views of one issue.
  */
 export function IssueCard({
@@ -86,7 +86,7 @@ export function IssueCard({
       <div className="px-[15px] pt-3.5 pb-[15px]">
         <div className="text-[11px]/[1.5] text-ink-8">
           fix checklist
-          {verification ? ' — re-run against the patch' : ' — Encore re-runs exactly these'}
+          {verification ? ' — re-run against the patch' : ' — the Cast re-runs exactly these'}
         </div>
         <div className="mt-2 flex flex-col gap-[7px]">
           {issue.fixChecklist.map((c) => {

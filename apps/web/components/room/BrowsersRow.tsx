@@ -16,7 +16,9 @@ import { ReplayModal } from '@/components/evidence/ReplayModal';
  */
 export function BrowsersRow({ feeds, note }: { feeds: FeedItem[]; note: string }) {
   const [open, setOpen] = useState<FeedItem | null>(null);
-  const cols = Math.min(3, Math.max(1, feeds.length));
+  // Two abreast, not three. At three the storefront inside each frame stops
+  // being legible, and an unreadable browser proves nothing.
+  const cols = feeds.length > 1 ? 2 : 1;
 
   return (
     <div className="land">

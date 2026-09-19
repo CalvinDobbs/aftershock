@@ -2,6 +2,9 @@ import { API_URL, LIVE, getRunDetail } from '@/lib/api';
 import { buildReplay } from '@/lib/replay';
 
 export const dynamic = 'force-dynamic';
+// A paced replay runs about a minute and a live run considerably longer, so
+// the stream must outlive the platform's default function timeout.
+export const maxDuration = 300;
 
 const SSE_HEADERS = {
   'content-type': 'text/event-stream; charset=utf-8',
