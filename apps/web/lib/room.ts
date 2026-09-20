@@ -12,6 +12,7 @@ import type {
   VerificationRow,
 } from '@aftershock/schema';
 import { BOTS, BOT_BY_ARCHETYPE, type BotId } from '@/components/bots/registry';
+import { sayFailure, sayValue, shortSource, trim } from './voice';
 
 /**
  * The room is a *projection* of the pipeline, not a data source the pipeline
@@ -165,9 +166,14 @@ export function deriveRoom(s: RunState): RoomEntry[] {
   if (s.charter) {
     const c = s.charter;
     const diff = c.assertions.find((a) => a.type === 'differential');
-    let body = `${cap(run.commit.author)} says this ${lowerFirst(stripDot(c.intent.summary))}. That's ${c.intent.claims.length} things the diff claims are true.`;
+    // Scout's summary and the journey are quoted rather than conjugated into
+    // the sentence. Inlining them meant the grammar depended on how a model
+    // happened to phrase a fragment, and it lost that bet every run:
+    // "Nikhil-Doal says this add and validate coupon code input at checkout".
+    const claims = c.intent.claims.length;
+    let body = `${cap(run.commit.author)}'s commit says: ${cap(stripDot(trim(c.intent.summary, 180)))}. That's ${claims} claim${claims === 1 ? '' : 's'} I can check.`;
     if (diff) {
-      body += ` I'm also sending someone down ${lowerFirst(stripDot(diff.journey ?? diff.route))}, against main at the same time — nothing in the diff mentions it, which is exactly why I want it watched.`;
+      body += ` I'm also running the core journey — "${stripDot(diff.journey ?? diff.route)}" — against main at the same time. The diff never mentions it, which is exactly why I want it watched.`;
     }
     out.push({
       kind: 'message',
@@ -182,7 +188,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
           rows: c.assertions.map((a) => ({
             id: a.id,
             statement: a.statement ?? a.journey ?? a.route,
-            source: a.derivedFrom ?? a.rationale ?? 'unclaimed',
+            source: shortSource(a.derivedFrom ?? a.rationale ?? 'unclaimed'),
           })),
         },
       ],
@@ -280,7 +286,9 @@ export function deriveRoom(s: RunState): RoomEntry[] {
   for (const a of speaking) {
     const bot = botFor(a);
     const finding = s.findings.find((f) => f.assignmentIds.includes(a.id));
-    const said = verdictOf(a.trace);
+    // The trace is the agent's own words, but in the vocabulary of the thing
+    // it drives. `sayFailure` unwraps the roles; it invents nothing.
+    const said = trim(sayFailure(verdictOf(a.trace)), 260);
     const { before, after } = evidencePair(a);
 
     const attachments: Attachment[] = [];
@@ -314,7 +322,9 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     const fallback =
       a.status === 'errored'
         ? `My session died at step ${a.steps.length} before I could finish ${a.assertionId}. The run carries on without me.`
-        : (finding?.actual ?? '');
+        : finding?.actual
+          ? trim(sayFailure(finding.actual), 260)
+          : '';
 
     out.push({
       kind: 'message',
@@ -343,14 +353,34 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     const cut = s.findings.filter((f) => f.status !== 'confirmed');
     const parts: string[] = [];
 
-    kept.forEach((f, i) => {
-      const b = BOTS[reporter(f, s.assignments)].name;
-      parts.push(
-        i === 0
-          ? `@${b} keeping yours — ${f.reproCount} of ${f.reproAttempts}, and main does the right thing, so it's new.`
-          : `@${b} yours too, ${f.confidence.toFixed(2)}.`,
-      );
-    });
+    // Grouped by reporter. Addressing the same bot once per finding produced
+    // "@QAizen yours too, 0.75. @QAizen yours too, 0.75." — the room repeating
+    // itself because the loop was over findings rather than over people.
+    const byReporter = new Map<BotId, Finding[]>();
+    for (const f of kept) {
+      const b = reporter(f, s.assignments);
+      byReporter.set(b, [...(byReporter.get(b) ?? []), f]);
+    }
+    let first = true;
+    for (const [bot, fs] of byReporter) {
+      const name = BOTS[bot].name;
+      const lead = fs[0]!;
+      if (first) {
+        parts.push(
+          `@${name} keeping yours — reproduced ${lead.reproCount} of ${lead.reproAttempts}, and main does the right thing, so it's new.`,
+        );
+        if (fs.length > 1) {
+          parts.push(`Your other ${fs.length - 1} stand${fs.length - 1 === 1 ? 's' : ''} too.`);
+        }
+        first = false;
+      } else {
+        parts.push(
+          fs.length === 1
+            ? `@${name} yours stands as well, ${lead.confidence.toFixed(2)}.`
+            : `@${name} all ${fs.length} of yours stand.`,
+        );
+      }
+    }
     for (const f of cut) {
       parts.push(
         f.status === 'pre_existing'
@@ -403,8 +433,8 @@ export function deriveRoom(s: RunState): RoomEntry[] {
     const failingStep = cited?.steps.find((st) => !st.ok)?.idx ?? cited?.steps.length ?? 0;
 
     let body = net
-      ? `The network log settles it before I open a file. ${stripDot(net)}. Client state, not the API. ${h.explanation}`
-      : h.explanation;
+      ? `The network log settles it before I open a file. ${stripDot(net)}. Client state, not the API. ${trim(h.explanation, 320)}`
+      : trim(h.explanation, 380);
     if (cited) body += ` @${BOTS[botFor(cited)].name}'s step ${failingStep} is the whole argument.`;
 
     out.push({
@@ -468,8 +498,8 @@ export function deriveRoom(s: RunState): RoomEntry[] {
 
       const body =
         bot === 'doppler'
-          ? `Re-ran both sides against the patch preview, same Actions as before. ${flipped?.beforeValue ?? 'the delta'} is now ${flipped?.afterValue ?? 'gone'}.${v.regressionSuitePassed ? ' Nothing else differs from main either, so the fix did not trade one regression for another.' : ' Something else differs now — sending it back.'}`
-          : `Replayed ${ids} against the patch preview. Same Action sequence, no new planning, so this is the same test that failed. ${flipped?.beforeValue ?? '—'} before, ${flipped?.afterValue ?? '—'} now.`;
+          ? `Re-ran both sides against the patch preview, same Actions as before. ${cap(sayValue(flipped?.beforeValue ?? 'the delta'))} is now ${sayValue(flipped?.afterValue ?? 'gone')}.${v.regressionSuitePassed ? ' Nothing else differs from main either, so the fix did not trade one regression for another.' : ' Something else differs now — sending it back.'}`
+          : `Replayed ${ids} against the patch preview. Same Action sequence, no new planning, so this is the same test that failed. ${sayValue(flipped?.beforeValue ?? '—')} before, ${sayValue(flipped?.afterValue ?? '—')} now.`;
 
       out.push({
         kind: 'message',

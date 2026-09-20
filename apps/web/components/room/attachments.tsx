@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import clsx from 'clsx';
 import type { Assignment, Finding } from '@aftershock/schema';
 import type { Attachment } from '@/lib/room';
@@ -7,6 +8,8 @@ import { botFor } from '@/lib/room';
 import { BOTS } from '@/components/bots/registry';
 import { BrowserFrame } from '@/components/ui/BrowserFrame';
 import { PageShot } from '@/components/ui/PageShot';
+import { ShotModal } from '@/components/evidence/ReplayModal';
+import { sayLabel, sayValue } from '@/lib/voice';
 import { IssueCard } from './IssueCard';
 import { PatchCard } from './PatchCard';
 
@@ -108,7 +111,7 @@ function ValueReadout({
 
 // --- Doppler's paired panes -------------------------------------------------
 
-const shorten = (s: string) => s.replace(/^\[data-testid="(.+)"\]$/, '$1').replace(/-/g, ' ');
+
 
 function DiffPair({
   baseLabel,
@@ -119,21 +122,30 @@ function DiffPair({
   headLabel: string;
   rows: { label: string; base: string; head: string; differs: boolean }[];
 }) {
+  // A delta names its node by the content it had on base, so for a pure value
+  // regression the row label and the base column are the same string — the
+  // pane read "$84.00   $84.00". Where that is true the label adds nothing and
+  // the panes become two aligned columns of values, which is the comparison.
+  const labelled = rows.some((r) => sayLabel(r.label) !== sayValue(r.base));
+
   const Panel = ({ label, side, flagged }: { label: string; side: 'base' | 'head'; flagged: boolean }) => (
     <div
       className="min-w-0 flex-1 rounded-[11px] bg-card-2 px-3 py-[11px]"
       style={{ outline: flagged ? '1.5px solid var(--color-flare)' : undefined }}
     >
       <div className="mono mb-[9px] truncate text-[10.5px]/[1] text-ink-6">{label}</div>
-      {rows.map((r) => {
-        const v = side === 'base' ? r.base : r.head;
+      {rows.map((r, i) => {
+        const v = sayValue(side === 'base' ? r.base : r.head);
         const hot = side === 'head' && r.differs;
         return (
-          <div key={r.label} className="mb-1.5 flex justify-between gap-2 last:mb-0">
-            <span className="truncate text-[12px]/[1] text-ink-7">{shorten(r.label)}</span>
+          <div key={`${r.label}-${i}`} className="mb-1.5 flex justify-between gap-2 last:mb-0">
+            {labelled && (
+              <span className="truncate text-[12px]/[1] text-ink-7">{sayLabel(r.label)}</span>
+            )}
             <span
               className={clsx(
                 'mono shrink-0 text-[12px]/[1]',
+                labelled ? '' : 'flex-1 text-left',
                 hot ? 'font-medium text-alarm' : 'text-ink-2',
               )}
             >
@@ -214,14 +226,29 @@ function Citation({
 }) {
   const step = assignment.steps.find((s) => s.idx === stepIdx) ?? assignment.steps.at(-1);
   const bot = BOTS[botFor(assignment)];
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="mt-[9px] flex items-center gap-3 rounded-[13px] bg-card px-[13px] py-[11px]">
-      <div className="w-[136px] flex-none">
+      {/* The same frame, enlargeable. A citation you cannot read is decoration. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`Expand ${assignment.assertionId} step ${stepIdx}`}
+        className="w-[136px] flex-none cursor-zoom-in rounded-[8px] transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-amber focus-visible:outline-none"
+      >
         <BrowserFrame dots={3} radius={7}>
           <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="sm" />
         </BrowserFrame>
-      </div>
+      </button>
+      {open && (
+        <ShotModal
+          title={`${bot.name} · ${assignment.assertionId} · step ${stepIdx}`}
+          subtitle={assignment.route}
+          {...(step ? { step } : {})}
+          onClose={() => setOpen(false)}
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="mono text-[11px]/[1.5] text-ink-6">
           {bot.name} · {assignment.assertionId} · step {stepIdx}

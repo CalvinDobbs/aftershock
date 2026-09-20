@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import type { Step } from '@aftershock/schema';
 import { PageShot } from '@/components/ui/PageShot';
+import { Developing } from '@/components/ui/Developing';
 import { Spinner } from '@/components/ui/atoms';
+import { useHlsVideo, useNearViewport } from '@/lib/useHlsVideo';
 
 export type FeedState = 'queued' | 'running' | 'passed' | 'failed' | 'errored' | 'skipped';
 
@@ -17,8 +19,13 @@ export type FeedState = 'queued' | 'running' | 'passed' | 'failed' | 'errored' |
  * each one arrived at a different moment.
  *
  * A running session shows Browserbase Live View; once it closes there is a
- * recording, so it switches to HLS. Before either exists it draws the step's
- * visible-text digest, which means a feed is never an empty grey rectangle.
+ * recording, so it switches to buffered HLS. Before either exists it draws the
+ * step's visible-text digest, which means a feed is never an empty rectangle.
+ *
+ * **Recordings load only once the card is near the viewport.** A run has seven
+ * of them and fetching all seven at once made the whole room stutter while
+ * they competed for bandwidth — the cost of the ones you had not scrolled to
+ * yet was paid by the one you were looking at.
  */
 export function Feed({
   sessionId,
@@ -39,9 +46,30 @@ export function Feed({
   url?: string;
   onOpen?: () => void;
 }) {
-  const media = useRef<HTMLVideoElement>(null);
+  const { ref: box, near, visible } = useNearViewport<HTMLDivElement>();
   const [live, setLive] = useState<string | null>(null);
-  const [playable, setPlayable] = useState(false);
+  const [liveLoaded, setLiveLoaded] = useState(false);
+
+  const recorded = state !== 'running' && !!sessionId;
+  const { ref: media, ready, progress, error } = useHlsVideo(recorded ? sessionId : null, near);
+
+  // A recording that never starts arriving must not leave the frame blurred
+  // forever. Recordings expire after 31 days and their segment links after
+  // six hours, so "no clip" is a normal end state, not an exception — and the
+  // screenshot underneath is still perfectly good evidence.
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    setGaveUp(false);
+    if (!recorded || !near) return;
+    const t = setTimeout(() => setGaveUp(true), 9000);
+    return () => clearTimeout(t);
+  }, [recorded, near, sessionId]);
+  // Progress resets the clock: something is arriving, so keep waiting.
+  useEffect(() => {
+    if (progress > 0) setGaveUp(false);
+  }, [progress]);
+
+  const developing = recorded && near && !error && !gaveUp;
 
   // Live View while the session is open. Dropping `live` when the session
   // closes is what lets the recording take over — a debugger iframe for a
@@ -49,7 +77,7 @@ export function Feed({
   useEffect(() => {
     if (state !== 'running' || !sessionId) {
       setLive(null);
-      setPlayable(false);
+      setLiveLoaded(false);
       return;
     }
     let ok = true;
@@ -62,45 +90,16 @@ export function Feed({
     };
   }, [state, sessionId]);
 
-  // The recording, once there is one.
+  // Play only once it can play through, and only while on screen. Autoplay on
+  // the first decoded frame is what made these stutter — the player was racing
+  // its own download — and six clips looping off-screen is six decoders
+  // running for nobody.
   useEffect(() => {
-    if (state === 'running' || !sessionId) return;
-    let hls: import('hls.js').default | null = null;
-    let cancelled = false;
-
-    (async () => {
-      const res = await fetch(`/api/replays/${sessionId}`);
-      if (!res.ok || cancelled) return;
-      const meta = (await res.json()) as { pages: { pageId: string }[] };
-      const page = meta.pages[0];
-      const el = media.current;
-      if (!page || !el || cancelled) return;
-
-      const src = `/api/replays/${sessionId}/${page.pageId}`;
-      // Reveal on the first decoded frame, not on attach. Attaching only means
-      // the request went out; showing the element then gives a black flash
-      // before anything decodes.
-      el.addEventListener('loadeddata', () => !cancelled && setPlayable(true), { once: true });
-
-      // Chromium answers canPlayType() for HLS with a non-empty "maybe" and
-      // then fails the load, so hls.js is tried first and native is the
-      // fallback rather than the other way round.
-      const Hls = (await import('hls.js')).default;
-      if (cancelled) return;
-      if (Hls.isSupported()) {
-        hls = new Hls({ enableWorker: true });
-        hls.loadSource(src);
-        hls.attachMedia(el);
-      } else {
-        el.src = src;
-      }
-    })().catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-      hls?.destroy();
-    };
-  }, [state, sessionId]);
+    const el = media.current;
+    if (!el || !ready) return;
+    if (visible) void el.play().catch(() => undefined);
+    else el.pause();
+  }, [ready, visible, media]);
 
   const flagged = state === 'failed' || state === 'errored';
   // Queued and skipped both dim: one has not run, the other ran and was
@@ -110,26 +109,25 @@ export function Feed({
   return (
     <figure className="m-0 min-w-0">
       <div
+        ref={box}
         className={clsx(
-          'relative w-full overflow-hidden rounded-[9px] bg-shot',
+          'group relative w-full overflow-hidden rounded-[9px] bg-shot',
           pending && 'opacity-45',
-          onOpen && 'cursor-pointer',
+          onOpen && 'cursor-zoom-in',
         )}
         style={{ aspectRatio: '16 / 10', outline: flagged ? '1.5px solid var(--color-flare)' : undefined }}
         onClick={onOpen}
         role={onOpen ? 'button' : undefined}
         tabIndex={onOpen ? 0 : undefined}
+        aria-label={onOpen ? `Expand ${label}` : undefined}
         onKeyDown={(e) => onOpen && (e.key === 'Enter' || e.key === ' ') && onOpen()}
       >
         {live ? (
           <iframe
             src={live}
             title={`${label} live view`}
-            onLoad={() => setPlayable(true)}
-            className={clsx(
-              'absolute inset-0 size-full border-0',
-              playable ? 'reveal' : 'opacity-0',
-            )}
+            onLoad={() => setLiveLoaded(true)}
+            className={clsx('absolute inset-0 size-full border-0', liveLoaded ? 'reveal' : 'opacity-0')}
             sandbox="allow-same-origin allow-scripts"
           />
         ) : (
@@ -139,25 +137,42 @@ export function Feed({
             <video
               ref={media}
               muted
-              autoPlay
               loop
               playsInline
+              preload="auto"
               className={clsx(
                 'absolute inset-0 size-full object-cover',
-                playable ? 'reveal' : 'opacity-0',
+                ready ? 'reveal' : 'opacity-0',
               )}
             />
-            {/* Stays mounted under the video and fades out as it arrives, so
-                there is never an empty frame between the two. */}
-            <div
-              className={clsx(
-                'absolute inset-0 overflow-hidden transition-opacity duration-500',
-                playable ? 'opacity-0' : 'breathe opacity-100',
-              )}
-            >
-              <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="md" />
-            </div>
+            {/* The captured frame. It develops while a clip is on its way and
+                otherwise just sits there sharp — a frame nobody is waiting on
+                should not look like one that is loading. */}
+            {!ready &&
+              (developing ? (
+                <Developing progress={progress} compact>
+                  <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="md" />
+                </Developing>
+              ) : (
+                <div className="absolute inset-0 overflow-hidden">
+                  <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="md" />
+                </div>
+              ))}
           </>
+        )}
+
+        {onOpen && (
+          <span className="pointer-events-none absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-full bg-black/55 text-white/80 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path
+                d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         )}
 
         {url && (

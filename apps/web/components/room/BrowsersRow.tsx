@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { FeedItem } from '@/lib/room';
 import { BotAvatar } from '@/components/bots/BotAvatar';
 import { Feed } from './Feed';
-import { ReplayModal } from '@/components/evidence/ReplayModal';
+import { ReplayModal, ShotModal } from '@/components/evidence/ReplayModal';
 
 /**
  * Every browser in the run, in one row in the thread.
@@ -44,18 +44,29 @@ export function BrowsersRow({ feeds, note }: { feeds: FeedItem[]; note: string }
             caption={f.caption}
             step={f.step}
             url={f.url}
-            onOpen={f.sessionId ? () => setOpen(f) : undefined}
+            {...(f.step || f.sessionId ? { onOpen: () => setOpen(f) } : {})}
           />
         ))}
       </div>
 
-      {open?.sessionId && (
+      {/* A closed session has a recording; one still running, or one that
+          never got a session at all, has only the frame it captured. Either
+          way clicking the card enlarges what there is. */}
+      {open?.sessionId ? (
         <ReplayModal
           sessionId={open.sessionId}
           title={`${open.assignmentId} — ${open.caption}`}
+          {...(open.step ? { step: open.step } : {})}
           onClose={() => setOpen(null)}
         />
-      )}
+      ) : open ? (
+        <ShotModal
+          title={`${open.assignmentId} — ${open.caption}`}
+          subtitle={open.url}
+          {...(open.step ? { step: open.step } : {})}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
     </div>
   );
 }

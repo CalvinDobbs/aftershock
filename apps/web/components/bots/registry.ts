@@ -41,6 +41,16 @@ export type Bot = {
   name: string;
   /** Sidebar one-liner — what this bot is for. */
   blurb: string;
+  /**
+   * The bot as one character. Chosen for the job, not for decoration: the
+   * profile panel leads with it and a face at 12px in a list needs something
+   * that reads at a glance.
+   */
+  emoji: string;
+  /** How to say the name, in the profile panel. Every good roster has this. */
+  pronounce: string;
+  /** Two or three sentences on what this one is for, for the profile panel. */
+  about: string;
   /** Byline next to the name on a message. */
   role: string;
   /** Which pipeline stage this bot owns. */
@@ -66,6 +76,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'maestro',
     name: 'Maestro',
     blurb: 'runs the room, writes to GitHub',
+    emoji: '🎬',
+    pronounce: 'MY-stroh',
+    about:
+      "The Director. Deterministic code rather than a model: it runs the stage machine, holds the concurrency semaphore, and writes the run's journal. Everything else in this room is something you can wait on. Maestro is the thing doing the waiting.",
     role: 'runs the room',
     stage: 'trigger',
     fill: '#8a8a8a',
@@ -78,6 +92,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'diffany',
     name: 'Diffany',
     blurb: 'turns the diff into claims',
+    emoji: '🧾',
+    pronounce: 'DIFF-uh-nee',
+    about:
+      "Reads the diff and the commit message before any browser opens, and turns what the change claims into assertions somebody can actually check. Every assertion carries a pointer back to the line that justified it, so nothing is invented.",
     role: 'reads diffs',
     stage: 'scout',
     fill: '#d6a13c',
@@ -90,6 +108,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'qaizen',
     name: 'QAizen',
     blurb: 'checks a claim start to finish',
+    emoji: '🧪',
+    pronounce: 'KY-zen',
+    about:
+      "The conformance oracle. Takes one claim and drives a real browser start to finish to find out whether the shipped code does what the commit message said. Answers one question only: does this do what it says?",
     role: 'checks a claim',
     stage: 'cast',
     fill: '#4fae7a',
@@ -102,6 +124,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'doppler',
     name: 'Doppler',
     blurb: 'runs your branch against main',
+    emoji: '👥',
+    pronounce: 'DOP-lur',
+    about:
+      "The differential oracle. Runs the same recorded actions against your branch and against main, then diffs the two accessibility trees. Plans once and replays on both sides, so a difference is a regression rather than model variance.",
     role: 'two sessions, one script',
     stage: 'cast',
     fill: '#5b8fd6',
@@ -114,6 +140,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'gavel',
     name: 'Gavel',
     blurb: 'the only one allowed to file',
+    emoji: '⚖️',
+    pronounce: 'GAV-ul',
+    about:
+      "The Critic, and the only agent allowed to file. Tries to kill every finding before it believes it: reproduces the failure with the recorded actions, checks the behaviour is absent on main, and scores confidence against a 0.70 threshold. Three issues a run, maximum.",
     role: 'decides what counts',
     stage: 'critic',
     fill: '#d6604f',
@@ -126,6 +156,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'clueso',
     name: 'Clueso',
     blurb: 'reads the log, then the code',
+    emoji: '🔍',
+    pronounce: 'kloo-ZOH',
+    about:
+      "Reads the failure trace, the console and the network log, then goes into the codebase and ranks the files that could have caused it. Diagnosis is kept separate from repair on purpose — merged, you get patches that fix the symptom.",
     role: 'finds the line',
     stage: 'sleuth',
     fill: '#4f9fd6',
@@ -138,6 +172,10 @@ export const BOTS: Record<BotId, Bot> = {
     id: 'patchouli',
     name: 'Patchouli',
     blurb: 'writes the smallest patch',
+    emoji: '🩹',
+    pronounce: 'puh-CHOO-lee',
+    about:
+      "Writes the smallest patch that satisfies the fix checklist, then hands it to the Cast to be re-run. Two attempts: the second one gets the first one's failure as context. If neither verifies, the pull request opens as a draft that says so.",
     role: 'writes the patch',
     stage: 'understudy',
     fill: '#68b55f',

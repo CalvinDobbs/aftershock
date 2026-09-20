@@ -44,6 +44,8 @@ export function Sidebar({
   roster,
   runCostMs,
   author,
+  onSelectBot,
+  selectedBot,
 }: {
   runs: RunSummary[];
   activeRunId: string;
@@ -51,6 +53,9 @@ export function Sidebar({
   runCostMs: number;
   /** Whoever pushed the commit under test. Empty until Scout has read it. */
   author: string;
+  /** Opens the profile panel. A face you cannot click is a face that owes you an answer. */
+  onSelectBot: (bot: BotId) => void;
+  selectedBot: BotId | null;
 }) {
   // Defaults render on the server; the stored preference is applied after
   // mount so the two passes agree.
@@ -89,10 +94,17 @@ export function Sidebar({
         {ROSTER.map((id) => {
           const st = roster[id];
           return (
-            <span
+            <button
               key={id}
-              className={clsx('relative', st.tone === 'idle' && 'opacity-55')}
+              type="button"
+              onClick={() => onSelectBot(id)}
+              aria-label={`${BOTS[id].name} — ${st.line}`}
               title={`${BOTS[id].name} — ${st.line}`}
+              className={clsx(
+                'relative rounded-full transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-amber focus-visible:outline-none',
+                st.tone === 'idle' && 'opacity-55',
+                selectedBot === id && 'ring-2 ring-amber',
+              )}
             >
               <BotAvatar bot={id} size={28} />
               <span
@@ -102,7 +114,7 @@ export function Sidebar({
                   st.tone === 'live' && 'blink',
                 )}
               />
-            </span>
+            </button>
           );
         })}
       </aside>
@@ -174,11 +186,15 @@ export function Sidebar({
             {ROSTER.map((id) => {
               const st = roster[id];
               return (
-                <div
+                <button
                   key={id}
+                  type="button"
+                  onClick={() => onSelectBot(id)}
+                  aria-label={`Open ${BOTS[id].name}'s profile`}
                   className={clsx(
-                    'flex items-center gap-2.5 rounded-[10px] px-2.5 py-2',
+                    'flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-[#161616] focus-visible:ring-2 focus-visible:ring-amber focus-visible:outline-none',
                     st.tone === 'idle' && 'opacity-55',
+                    selectedBot === id && 'bg-bubble',
                   )}
                 >
                   <span className="relative flex-none">
@@ -211,7 +227,7 @@ export function Sidebar({
                       {st.line}
                     </span>
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

@@ -1,192 +1,145 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-
-type Meta = {
-  pageCount: number;
-  pages: { pageId: string; startTimeMs: number; endTimeMs: number; url: string }[];
-};
+import type { Step } from '@aftershock/schema';
+import { Lightbox } from '@/components/ui/Lightbox';
+import { Developing } from '@/components/ui/Developing';
+import { PageShot } from '@/components/ui/PageShot';
+import { useHlsVideo } from '@/lib/useHlsVideo';
 
 /**
- * Browserbase session replay, full size.
+ * A Browserbase session recording, full size.
  *
- * Both calls go through our own origin: the playlist needs `x-bb-api-key`, so
- * fetching it from the browser would hand the key to every viewer. Our route
- * forwards the `.m3u8` unchanged and the segment URLs inside it are pre-signed
- * CDN links, so video bytes never touch our server.
- *
- * Our agents are single-tab, so we take pages[0].
+ * The clip buffers before it is shown — see `useHlsVideo` — so opening one
+ * never gives you a stuttering first two seconds. Until it is ready the frame
+ * the agent captured develops in place, which means the box is never empty and
+ * never changes size.
  */
 export function ReplayModal({
   sessionId,
   title,
   subtitle,
+  step,
   onClose,
 }: {
   sessionId: string;
   title: string;
   subtitle?: string;
+  /** The frame to develop while the recording buffers. */
+  step?: Step;
   onClose: () => void;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
-  const closeButton = useRef<HTMLButtonElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [ready, setReady] = useState(false);
-
-  // Callers pass an inline arrow for onClose, so it changes every render.
-  // Holding it in a ref keeps the mount effect from re-running on every SSE
-  // tick — which would drag focus back to Close mid-playback and turn Space
-  // into "dismiss" instead of "pause".
-  const close = useRef(onClose);
-  close.current = onClose;
-  const dismiss = useCallback(() => close.current(), []);
+  const { ref, ready, progress, error } = useHlsVideo(sessionId, true);
+  const [pages, setPages] = useState<number | null>(null);
+  // As in the feed: a clip that never arrives leaves the captured frame sharp
+  // rather than blurred behind a progress bar that will never fill.
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setGaveUp(true), 9000);
+    return () => clearTimeout(t);
+  }, [sessionId]);
+  useEffect(() => {
+    if (progress > 0) setGaveUp(false);
+  }, [progress]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
-    window.addEventListener('keydown', onKey);
-    // The page behind must not scroll under an open replay.
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    closeButton.current?.focus();
+    let ok = true;
+    fetch(`/api/replays/${sessionId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m: { pageCount?: number } | null) => ok && m && setPages(m.pageCount ?? null))
+      .catch(() => undefined);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, []);
-
-  useEffect(() => {
-    let hls: import('hls.js').default | null = null;
-    let cancelled = false;
-
-    (async () => {
-      const res = await fetch(`/api/replays/${sessionId}`);
-      if (cancelled) return;
-      if (!res.ok) {
-        setError(
-          res.status === 501
-            ? 'No Browserbase key is configured on the dashboard, so recordings cannot be fetched.'
-            : `Could not load this recording (${res.status}).`,
-        );
-        return;
-      }
-      const m = (await res.json()) as Meta;
-      if (cancelled) return;
-      setMeta(m);
-
-      const page = m.pages[0];
-      if (!page) {
-        setError('This session has no recorded pages.');
-        return;
-      }
-
-      const el = video.current;
-      if (!el) return;
-      el.addEventListener('loadeddata', () => !cancelled && setReady(true), { once: true });
-
-      const src = `/api/replays/${sessionId}/${page.pageId}`;
-      const Hls = (await import('hls.js')).default;
-      if (cancelled) return;
-      if (Hls.isSupported()) {
-        hls = new Hls({ enableWorker: true });
-        hls.loadSource(src);
-        hls.attachMedia(el);
-        hls.on(Hls.Events.ERROR, (_e, data) => {
-          if (data.fatal) setError(`Playback failed: ${data.details}`);
-        });
-      } else if (el.canPlayType('application/vnd.apple.mpegurl')) {
-        el.src = src;
-      } else {
-        setError('This browser cannot play HLS.');
-      }
-    })().catch((e: unknown) => setError((e as Error).message));
-
-    return () => {
-      cancelled = true;
-      hls?.destroy();
+      ok = false;
     };
   }, [sessionId]);
 
+  // Only start playing once it can play through, so the first frame you see
+  // is the first frame of a clip that will not stall.
+  useEffect(() => {
+    if (ready) void ref.current?.play().catch(() => undefined);
+  }, [ready, ref]);
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-6 backdrop-blur-[10px] sm:p-10"
-      onClick={dismiss}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+    <Lightbox
+      title={title}
+      subtitle={`${subtitle ? `${subtitle} · ` : ''}${sessionId}`}
+      onClose={onClose}
+      footer={
+        <span className="mono text-[11px]/[1.5] text-ink-8">
+          {error ? 'recording unavailable' : pages ? `${pages} page${pages === 1 ? '' : 's'} recorded` : ' '}
+        </span>
+      }
     >
-      <div
-        className="land relative flex w-full max-w-[1180px] flex-col overflow-hidden rounded-[18px] bg-stage shadow-[0_40px_120px_-24px_rgba(0,0,0,.9)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3 px-6 py-4">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[15px]/[1.3] font-medium text-ink">{title}</div>
-            <div className="mono mt-1 truncate text-[11.5px]/[1.3] text-ink-7">
-              {subtitle ? `${subtitle} · ` : ''}
-              {sessionId}
+      {/* 16:10 to match the feed it was opened from, so the frame you clicked
+          is the frame you get — just larger. */}
+      <div className="relative overflow-hidden rounded-[12px] bg-shot" style={{ aspectRatio: '16 / 10' }}>
+        {error ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center">
+            <div className="text-[13.5px]/[1.6] text-ink-5">{error}</div>
+            <div className="mono text-[11.5px]/[1.6] text-ink-8">
+              Recordings are kept 31 days; segment links expire after 6 hours.
             </div>
           </div>
-
-          <button
-            ref={closeButton}
-            type="button"
-            onClick={dismiss}
-            aria-label="Close recording"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-chip text-ink-5 transition-colors hover:bg-[#3a3a3a] hover:text-ink focus-visible:ring-2 focus-visible:ring-amber focus-visible:outline-none"
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* 16:10 to match the feed it was opened from, so the frame you clicked
-            is the frame you get — just larger. */}
-        <div className="relative mx-4 overflow-hidden rounded-[12px] bg-shot" style={{ aspectRatio: '16 / 10' }}>
-          {error ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center">
-              <div className="text-[13.5px]/[1.6] text-ink-5">{error}</div>
-              <div className="mono text-[11.5px]/[1.6] text-ink-8">
-                Recordings are kept 31 days; segment links expire after 6 hours.
-              </div>
-            </div>
-          ) : (
-            <>
-              {!ready && (
-                <div className="breathe absolute inset-0 flex items-center justify-center">
-                  <span className="mono text-[11.5px]/[1] text-ink-8">loading the recording</span>
-                </div>
+        ) : (
+          <>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            {/* Muted so autoplay is permitted: these recordings have no audio,
+                and a clip that opens paused on a blank first frame looks
+                broken. */}
+            <video
+              ref={ref}
+              controls={ready}
+              muted
+              playsInline
+              preload="auto"
+              className={clsx(
+                'absolute inset-0 size-full object-contain',
+                ready ? 'reveal' : 'opacity-0',
               )}
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video
-                ref={video}
-                controls
-                autoPlay
-                playsInline
-                className={clsx(
-                  'absolute inset-0 size-full object-contain',
-                  ready ? 'reveal' : 'opacity-0',
-                )}
-              />
-            </>
-          )}
-        </div>
+            />
+            {!ready &&
+              (gaveUp ? (
+                <div className="absolute inset-0 overflow-hidden">
+                  <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
+                </div>
+              ) : (
+                <Developing progress={progress}>
+                  <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
+                </Developing>
+              ))}
+          </>
+        )}
+      </div>
+    </Lightbox>
+  );
+}
 
-        <div className="flex items-center gap-3 px-6 py-3.5">
-          <span className="mono text-[11px]/[1.5] text-ink-8">
-            {meta ? `${meta.pageCount} page${meta.pageCount === 1 ? '' : 's'} recorded` : ' '}
-          </span>
-          <span className="flex-1" />
-          <span className="mono text-[11px]/[1.5] text-ink-8">esc to close</span>
+/**
+ * A single captured frame, full size.
+ *
+ * Screenshots used to be the one piece of evidence you could not enlarge,
+ * which made the small ones decorative. They open the same way recordings do,
+ * from the same shell, so "click the evidence" is one rule rather than two.
+ */
+export function ShotModal({
+  step,
+  title,
+  subtitle,
+  onClose,
+}: {
+  step?: Step;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+}) {
+  return (
+    <Lightbox title={title} subtitle={subtitle} onClose={onClose}>
+      <div className="relative overflow-hidden rounded-[12px] bg-shot" style={{ aspectRatio: '16 / 10' }}>
+        <div className="reveal absolute inset-0 overflow-auto">
+          <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
         </div>
       </div>
-    </div>
+    </Lightbox>
   );
 }

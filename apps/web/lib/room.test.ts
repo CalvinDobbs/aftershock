@@ -61,10 +61,22 @@ describe('a run that found something', () => {
 
   it('quotes the diff back at the author, with its citation', () => {
     const diffany = said(state(), 'diffany') as { body: string; attachments: { kind: string }[] };
-    // Quoted back in the author's own terms, lower-cased into the sentence.
+    // Quoted, not conjugated. The summary used to be lower-cased and spliced
+    // mid-sentence, which produced "says this add and validate coupon code
+    // input at checkout" whenever Scout phrased it as an imperative. It is
+    // now its own sentence, so the grammar cannot depend on Scout's phrasing.
     const summary = golden.charter.intent.summary;
-    expect(diffany.body).toContain(summary[0]!.toLowerCase() + summary.slice(1, 30));
+    expect(diffany.body).toContain(summary.slice(0, 30));
+    expect(diffany.body).not.toMatch(/says this [a-z]/);
+    expect(diffany.body).not.toMatch(/sending someone down [a-z]/);
     expect(diffany.attachments.map((a) => a.kind)).toContain('assertions');
+  });
+
+  it('quotes the differential journey rather than splicing it into a clause', () => {
+    const diffany = said(state(), 'diffany') as { body: string };
+    const journey = golden.charter.assertions.find((a) => a.type === 'differential');
+    if (!journey) return;
+    expect(diffany.body).toContain(`"${(journey.journey ?? journey.route).replace(/\.$/, '')}"`);
   });
 
   it('lets Gavel show its arithmetic and post the issue it filed', () => {

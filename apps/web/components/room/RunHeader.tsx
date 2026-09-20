@@ -5,19 +5,7 @@ import type { Run } from '@aftershock/schema';
 import { RunMark } from '@/components/bots/BotAvatar';
 import { duration } from '@/lib/format';
 
-export function RunHeader({
-  run,
-  sessions,
-  replaying,
-  onSkip,
-  onReplay,
-}: {
-  run: Run;
-  sessions: number;
-  replaying: boolean;
-  onSkip: () => void;
-  onReplay: () => void;
-}) {
+export function RunHeader({ run, sessions }: { run: Run; sessions: number }) {
   // A running clock has no server-side value, so tick it only after mount.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -43,13 +31,6 @@ export function RunHeader({
       <span className="hidden shrink-0 text-[12.5px]/[1] text-ink-7 sm:inline">
         {sessions} browsers · {elapsed}
       </span>
-      <button
-        type="button"
-        onClick={replaying ? onSkip : onReplay}
-        className="shrink-0 rounded-full bg-chip px-3 py-[6px] text-[11.5px]/[1] text-ink-5 transition-colors hover:bg-[#2e2e2e] hover:text-ink-2"
-      >
-        {replaying ? 'Skip to end' : 'Replay'}
-      </button>
     </header>
   );
 }

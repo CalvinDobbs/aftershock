@@ -2,6 +2,7 @@
 
 import clsx from 'clsx';
 import type { Finding, Issue, Verification } from '@aftershock/schema';
+import { sayFailure, saySpec, shortTitle } from '@/lib/voice';
 
 /**
  * The filed issue, posted into the thread by Gavel at the moment it is filed.
@@ -32,7 +33,9 @@ export function IssueCard({
         className="mt-2 flex items-center gap-2.5 rounded-[11px] border border-[#242424] bg-card px-3.5 py-2.5 transition-colors hover:border-[#2e2e2e]"
       >
         <span className="mono shrink-0 text-[11.5px]/[1] text-ink-6">#{issue.number}</span>
-        <span className="min-w-0 flex-1 truncate text-[13px]/[1.4] text-ink-4">{issue.title}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px]/[1.4] text-ink-4">
+          {shortTitle(issue.title, 110)}
+        </span>
         {finding && (
           <span className="mono shrink-0 text-[11px]/[1] text-ink-7">
             {finding.confidence.toFixed(2)}
@@ -47,7 +50,7 @@ export function IssueCard({
     <div className="mt-[9px] overflow-hidden rounded-[14px] border border-[#2a2a2a] bg-card">
       <div className="flex items-center gap-2.5 border-b border-edge px-[15px] py-3">
         <span className="mono text-[11.5px]/[1] text-ink-6">#{issue.number}</span>
-        <span className="text-[14px]/[1.3] font-medium text-ink-1">{issue.title}</span>
+        <span className="text-[14px]/[1.3] font-medium text-ink-1">{shortTitle(issue.title, 120)}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-[15px] pt-3">
@@ -73,12 +76,12 @@ export function IssueCard({
         <div className="grid gap-x-4 gap-y-2.5 px-[15px] pt-3.5 sm:grid-cols-2">
           <div>
             <div className="text-[11px]/[1.5] text-ink-8">should happen</div>
-            <div className="mt-1 text-[13px]/[1.55] text-ink-4">{finding.expected}</div>
+            <div className="mt-1 text-[13px]/[1.55] text-ink-4">{saySpec(finding.expected)}</div>
             <div className="mono mt-1.5 text-[10.5px]/[1.5] text-ink-8">{finding.expectedSource}</div>
           </div>
           <div>
             <div className="text-[11px]/[1.5] text-ink-8">does happen</div>
-            <div className="mt-1 text-[13px]/[1.55] text-ink-4">{finding.actual}</div>
+            <div className="mt-1 text-[13px]/[1.55] text-ink-4">{sayFailure(finding.actual)}</div>
           </div>
         </div>
       )}
@@ -111,7 +114,7 @@ export function IssueCard({
                   )}
                 </span>
                 <span className={clsx('text-[12.5px]/[1.45]', passed ? 'text-ink-5' : 'text-ink-7')}>
-                  {c}
+                  {saySpec(c)}
                 </span>
               </div>
             );
