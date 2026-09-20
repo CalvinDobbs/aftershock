@@ -17,7 +17,8 @@
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r test",
     "test:watch": "pnpm -r --parallel test:watch",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "live": "node scripts/demo-live.mjs"
   },
   "devDependencies": {
     "@types/node": "22.18.6",

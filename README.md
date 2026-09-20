@@ -209,6 +209,32 @@ Answers `202` with a run id; follow it on `/api/runs/:id/events/stream`.
 `baseUrl: null` is legal — differential pairs are skipped and the run continues
 on conformance alone.
 
+### One-command judging rehearsal
+
+With dependencies installed and the live repair environment configured:
+
+```bash
+pnpm live
+```
+
+This starts an isolated dashboard on port 3010, Director on 3011, and API on
+3012, then prints a fresh run link. It reuses the original broken coupon commit
+and its reachable preview. No branch reset or new feature PR is necessary:
+leave the generated repair PR unmerged to keep the original bug available.
+
+This is a manual trigger, not webhook detection. Each invocation may create
+GitHub issues, Vercel previews, and a repair PR. Nothing is merged automatically.
+The launcher refuses to run if the pinned baseline or coupon branch changed.
+
+- `pnpm live --check`: read-only configuration, branch, URL and port checks.
+- `pnpm live --serve-only`: starts servers and prints a clickable start link. Open
+  it when judges are ready: it starts one run and redirects to its dashboard.
+  Repeated clicks open the same run. No second terminal is needed.
+- `DEMO_PORT=3020 pnpm live`: uses ports 3020–3022 instead.
+- Leave the terminal open. Ctrl+C stops only these demo processes.
+- Each launch stores logs, media and run metadata under `.aftershock/demos/`.
+  Existing services and evidence are preserved.
+
 ### Enabling live repair
 
 The repair chain (issue filing, diagnosis, patch generation, preview deployment,

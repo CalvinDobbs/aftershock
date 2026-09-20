@@ -553,3 +553,10 @@ on `codex/anirudh-critic-director`; never push main.
 ## Publication handoff
 - User explicitly authorized pushing the reviewed fixes and documentation directly to Aftershock main. Running services and saved demo evidence must remain untouched.
 - README now documents required repair configuration, optional publication gating, dashboard-compatible manual triggers, verified rehearsal, and one-repair-per-run scope.
+
+## Repeatable judging launcher (local, not pushed)
+- Added scripts/demo-live.mjs and pnpm live. Pins known clean/broken refs and URLs, refuses changed branches, starts isolated ports 3010-3012 with separate frontend build and evidence directories.
+- --check is read-only; --serve-only starts services without triggering. Default triggers real repair publication but never merges. Existing feature PR reused when present.
+- Smoke-tested --serve-only: all three health checks passed; no remote writes or browser runs. Stopped only launcher-owned processes after test. Existing successful run remains on ports 3000-3002.
+
+- Launcher update: pnpm live --serve-only now prints a local, random start link. Opening it POSTs once to the API and redirects to the run dashboard. Repeated clicks share the same promise; no second terminal or manual curl needed. Listener stops with the launcher.
