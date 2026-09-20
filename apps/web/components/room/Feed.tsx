@@ -51,7 +51,9 @@ export function Feed({
   const [liveLoaded, setLiveLoaded] = useState(false);
 
   const recorded = state !== 'running' && !!sessionId;
-  const { ref: media, ready, progress, error } = useHlsVideo(recorded ? sessionId : null, near);
+  const { ref: media, painted, progress, error } = useHlsVideo(recorded ? sessionId : null, near, {
+    loop: true,
+  });
 
   // A recording that never starts arriving must not leave the frame blurred
   // forever. Recordings expire after 31 days and their segment links after
@@ -90,16 +92,15 @@ export function Feed({
     };
   }, [state, sessionId]);
 
-  // Play only once it can play through, and only while on screen. Autoplay on
-  // the first decoded frame is what made these stutter — the player was racing
-  // its own download — and six clips looping off-screen is six decoders
-  // running for nobody.
+  // The hook starts playback itself, hidden, so the clip is past its blank
+  // opening frames before anyone sees it. All that is left here is not
+  // leaving six decoders running for nobody once it is off screen.
   useEffect(() => {
     const el = media.current;
-    if (!el || !ready) return;
+    if (!el || !painted) return;
     if (visible) void el.play().catch(() => undefined);
     else el.pause();
-  }, [ready, visible, media]);
+  }, [painted, visible, media]);
 
   const flagged = state === 'failed' || state === 'errored';
   // Queued and skipped both dim: one has not run, the other ran and was
@@ -137,18 +138,17 @@ export function Feed({
             <video
               ref={media}
               muted
-              loop
               playsInline
               preload="auto"
               className={clsx(
                 'absolute inset-0 size-full object-cover',
-                ready ? 'reveal' : 'opacity-0',
+                painted ? 'reveal' : 'opacity-0',
               )}
             />
             {/* The captured frame. It develops while a clip is on its way and
                 otherwise just sits there sharp — a frame nobody is waiting on
                 should not look like one that is loading. */}
-            {!ready &&
+            {!painted &&
               (developing ? (
                 <Developing progress={progress} compact>
                   <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="md" />

@@ -81,7 +81,11 @@ export function Lightbox({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="pop flex max-h-full w-full max-w-[1180px] flex-col overflow-hidden rounded-[18px] bg-stage shadow-[0_40px_120px_-24px_rgba(0,0,0,.9)]">
+      {/* A definite height, not `max-h-full`. The media inside is absolutely
+          positioned and so contributes no intrinsic height — with only a
+          maximum, the panel collapsed to its own header and footer and the
+          frame rendered 0px tall. */}
+      <div className="pop flex h-full w-full max-w-[1180px] flex-col overflow-hidden rounded-[18px] bg-stage shadow-[0_40px_120px_-24px_rgba(0,0,0,.9)]">
         <div className="flex flex-none items-center gap-3 px-6 py-4">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[15px]/[1.3] font-medium text-ink">{title}</div>
@@ -102,7 +106,11 @@ export function Lightbox({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto px-4">{children}</div>
+        {/* Never scrolls: an expanded frame that needs a scrollbar to be seen
+            whole is not expanded. Children stretch to fill this — no
+            `items-center`, which would collapse a percentage height to zero —
+            and letterbox themselves inside it. */}
+        <div className="flex min-h-0 flex-1 overflow-hidden px-4 pb-1">{children}</div>
 
         <div className="flex flex-none items-center gap-3 px-6 py-3.5">
           {footer}

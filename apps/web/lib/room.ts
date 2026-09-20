@@ -12,7 +12,7 @@ import type {
   VerificationRow,
 } from '@aftershock/schema';
 import { BOTS, BOT_BY_ARCHETYPE, type BotId } from '@/components/bots/registry';
-import { sayFailure, sayValue, shortSource, trim } from './voice';
+import { sayFailure, sayValue, shortSource, subject, trim } from './voice';
 
 /**
  * The room is a *projection* of the pipeline, not a data source the pipeline
@@ -159,7 +159,7 @@ export function deriveRoom(s: RunState): RoomEntry[] {
   out.push({
     kind: 'system',
     id: 'sys-open',
-    text: `${cap(run.commit.author)} pushed ${run.commit.filesChanged} files — ${run.commit.message}`,
+    text: `${cap(run.commit.author)} pushed ${run.commit.filesChanged} files — ${subject(run.commit.message)}`,
   });
 
   // --- Diffany reads the diff ---

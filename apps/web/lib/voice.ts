@@ -145,6 +145,27 @@ export function shortTitle(text: string, max = 96): string {
 }
 
 /**
+ * A commit's subject line.
+ *
+ * Git's convention is a subject, a blank line, then the body, and the body is
+ * often several paragraphs. Rendered as HTML the newlines collapse, so the
+ * whole message arrives as one very long line — which is what the run header
+ * and the opening system line were both printing, twice, above a transcript
+ * that then has to be read underneath it.
+ *
+ * The subject is the part written to be read alone. Everything after the first
+ * blank line is detail that belongs in the commit, not in a header.
+ */
+export function subject(message: string, max = 92): string {
+  const first = squeeze(message.split(/\n\s*\n/)[0] ?? message).split('\n')[0] ?? '';
+  const t = squeeze(first) || squeeze(message);
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${stripDot(cut.slice(0, space > 0 ? space : max))}…`;
+}
+
+/**
  * The provenance column on the assertion list.
  *
  * Scout writes `components/CouponInput.tsx:54-59` — a location — or sometimes

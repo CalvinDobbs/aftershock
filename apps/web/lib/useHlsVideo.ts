@@ -5,46 +5,155 @@ import { useEffect, useRef, useState } from 'react';
 export type HlsState = {
   /** Attach to the <video>. */
   ref: React.RefObject<HTMLVideoElement | null>;
-  /** True once enough is buffered to play through without stalling. */
+  /** Buffered enough to play through without stalling. */
   ready: boolean;
+  /**
+   * A real frame of the page is on screen. This — not `ready` — is when the
+   * video should be revealed. See below.
+   */
+  painted: boolean;
   /** 0–1, how much of the clip is buffered. Drives the developing animation. */
   progress: number;
   error: string | null;
 };
 
 /**
- * A Browserbase recording, buffered before it is ever shown.
+ * How much to cut off each end of a recording.
  *
- * Playback used to begin on `loadeddata`, which fires as soon as one frame
- * exists. With seven recordings on screen that meant seven videos all starting
- * on their first frame and then stalling on every segment boundary — the
- * choppiness was the player racing its own download. Here nothing is revealed
- * until `canplaythrough`, so a clip that appears plays start to finish.
+ * A Browserbase session is recorded from the moment the browser exists, which
+ * is before the first navigation resolves and after the last page is torn
+ * down — so roughly half a second of genuine black sits at both ends of every
+ * clip. There is nothing to buffer harder: the black *is* the recording.
  *
- * `enabled` is how the room avoids paying for all of them at once: feeds pass
- * their own visibility, so only recordings actually on screen fetch anything.
+ * Proportional with a ceiling, so a three-second clip is not mostly trimmed.
+ */
+const TRIM = (duration: number) =>
+  Math.min(0.55, (Number.isFinite(duration) && duration > 0 ? duration : 4) * 0.07);
+
+/** The playable window of a clip, with both dead ends removed. */
+export function trimmed(el: HTMLVideoElement): { from: number; to: number } {
+  const d = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
+  if (!d) return { from: 0, to: 0 };
+  const t = TRIM(d);
+  return { from: t, to: Math.max(t + 0.1, d - t) };
+}
+
+/**
+ * A Browserbase recording, buffered *and* warmed before it is ever shown.
+ *
+ * Two separate problems produced the same symptom, and fixing only one left
+ * the other:
+ *
+ * 1. Playback used to begin on `loadeddata`, which fires as soon as a single
+ *    frame exists. Six clips then all started at once and stalled at every
+ *    segment boundary — the choppiness was the player racing its own
+ *    download. `canplaythrough` fixes that.
+ *
+ * 2. `canplaythrough` still means "ready to start", and a session recording
+ *    *starts on a blank page*: the browser is up before the first navigation
+ *    resolves, so frame zero is genuinely black. Revealing at `ready` showed
+ *    that black frame. There is nothing to buffer harder — the frame is the
+ *    recording.
+ *
+ * So the clip is played, muted and hidden, until a frame has actually been
+ * presented past a small offset; only then is it revealed. The captured
+ * screenshot stays on top for that whole time, which means the transition a
+ * viewer sees is developed-frame → live page, and never a black rectangle.
+ *
+ * `enabled` gates the download: feeds pass their own visibility, so a run with
+ * seven recordings does not fetch all seven before you have scrolled to them.
  *
  * Both requests go through our origin — the playlist needs `x-bb-api-key`, and
  * fetching it from the browser would hand the key to every viewer. The segment
- * URLs inside the playlist are pre-signed CDN links, so video bytes stream
- * direct and never touch our server.
+ * URLs inside are pre-signed CDN links, so video bytes stream direct.
  */
-export function useHlsVideo(sessionId: string | null, enabled: boolean): HlsState {
+export function useHlsVideo(
+  sessionId: string | null,
+  enabled: boolean,
+  { loop = false }: { loop?: boolean } = {},
+): HlsState {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [painted, setPainted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setReady(false);
+    setPainted(false);
+    setProgress(0);
+    setError(null);
     if (!sessionId || !enabled) return;
+
     let hls: import('hls.js').default | null = null;
     let cancelled = false;
     let poll: ReturnType<typeof setInterval> | null = null;
+    let paintGuard: ReturnType<typeof setTimeout> | null = null;
+    const cleanups: (() => void)[] = [];
 
-    const done = () => {
+    const reveal = () => {
+      if (cancelled) return;
+      setPainted(true);
+    };
+
+    /**
+     * Seek past the dead opening, play hidden, and reveal on the first frame
+     * actually presented. `loop` then keeps playback inside the trimmed
+     * window, so the black tail is never reached either.
+     */
+    const warm = (el: HTMLVideoElement) => {
+      const { from, to } = trimmed(el);
+      if (from > 0 && el.currentTime < from) el.currentTime = from;
+      el.muted = true;
+      void el.play().catch(() => undefined);
+
+      const onTime = () => {
+        if (cancelled || !to) return;
+        if (el.currentTime >= to) {
+          if (loop) el.currentTime = from;
+          else el.pause();
+        }
+      };
+      el.addEventListener('timeupdate', onTime);
+      cleanups.push(() => el.removeEventListener('timeupdate', onTime));
+
+      type WithRvfc = HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
+      };
+      const rvfc = (el as WithRvfc).requestVideoFrameCallback?.bind(el);
+
+      if (rvfc) {
+        // Fires per *presented* frame — the only real signal that something
+        // has been painted rather than merely decoded.
+        const tick = (_now: number, meta: { mediaTime: number }) => {
+          if (cancelled) return;
+          if (meta.mediaTime >= from) reveal();
+          else rvfc(tick);
+        };
+        rvfc(tick);
+      } else {
+        const onPaint = () => {
+          if (cancelled) return;
+          if (el.currentTime >= from) {
+            el.removeEventListener('timeupdate', onPaint);
+            reveal();
+          }
+        };
+        el.addEventListener('timeupdate', onPaint);
+        cleanups.push(() => el.removeEventListener('timeupdate', onPaint));
+      }
+
+      // Autoplay can be refused, and a clip nobody will ever paint must still
+      // appear. Showing a frame late beats showing nothing forever.
+      paintGuard = setTimeout(reveal, 2600);
+    };
+
+    const buffered = () => {
       if (cancelled) return;
       setProgress(1);
       setReady(true);
+      const el = ref.current;
+      if (el) warm(el);
     };
 
     (async () => {
@@ -69,9 +178,7 @@ export function useHlsVideo(sessionId: string | null, enabled: boolean): HlsStat
       const el = ref.current;
       if (!el) return;
 
-      // canplaythrough is the browser's own "I can finish this without
-      // stalling". loadeddata would only mean one frame decoded.
-      el.addEventListener('canplaythrough', done, { once: true });
+      el.addEventListener('canplaythrough', buffered, { once: true });
       // Belt and braces: some builds never fire canplaythrough for a short
       // VOD playlist. A clip that is fully buffered is ready whatever the
       // event log says, and a visible recording beats a perfect state machine.
@@ -82,8 +189,8 @@ export function useHlsVideo(sessionId: string | null, enabled: boolean): HlsStat
         const total = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
         if (total) {
           const frac = Math.min(1, end / total);
-          setProgress(frac);
-          if (frac > 0.985) done();
+          setProgress((p) => (frac > p ? frac : p));
+          if (frac > 0.985) buffered();
         } else if (end > 0) {
           // Duration unknown: show motion rather than a frozen bar.
           setProgress((p) => Math.min(0.9, p + 0.05));
@@ -116,19 +223,23 @@ export function useHlsVideo(sessionId: string | null, enabled: boolean): HlsStat
     return () => {
       cancelled = true;
       if (poll) clearInterval(poll);
-      ref.current?.removeEventListener('canplaythrough', done);
+      if (paintGuard) clearTimeout(paintGuard);
+      for (const off of cleanups) off();
+      ref.current?.removeEventListener('canplaythrough', buffered);
       hls?.destroy();
     };
-  }, [sessionId, enabled]);
+  }, [sessionId, enabled, loop]);
 
-  return { ref, ready, progress, error };
+  return { ref, ready, painted, progress, error };
 }
 
 /**
- * Whether an element is close enough to the viewport to be worth loading.
+ * Whether an element is near enough the viewport to load, and whether it is
+ * on screen right now.
  *
- * Latches on: once a recording has been fetched, scrolling past it should not
- * throw the buffer away and re-download it when you scroll back.
+ * `near` latches: having paid to download a clip, scrolling past it and back
+ * should not pay again. `visible` does not, because whether something should
+ * be *playing* is a question about right now.
  */
 export function useNearViewport<T extends HTMLElement>(margin = '300px') {
   const ref = useRef<T | null>(null);
@@ -146,9 +257,6 @@ export function useNearViewport<T extends HTMLElement>(margin = '300px') {
     const io = new IntersectionObserver(
       (entries) => {
         const on = entries.some((e) => e.isIntersecting);
-        // `near` latches: having paid to download a clip, scrolling past it
-        // and back should not pay again. `visible` does not, because whether
-        // something should be *playing* is a question about right now.
         if (on) setNear(true);
         setVisible(on);
       },

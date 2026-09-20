@@ -233,19 +233,29 @@ export function Sidebar({
           </div>
         </Section>
 
-        <div className="mt-5 flex flex-col gap-2 px-2.5 pb-5">
-          <div className="flex justify-between">
-            <span className="text-[12px]/[1] text-ink-7">browser budget</span>
-            <span className="mono text-[11.5px]/[1] text-ink-5">{used.toFixed(1)} / 100 h</span>
+        {/* A meter, not a caption with a line under it. The figure is the
+            thing being reported, so it is set like one; the ceiling stays
+            quiet beside it. A hair of amber is always visible, because a bar
+            reading zero and a bar that has not loaded look identical. */}
+        <div className="mt-5 px-2.5 pb-5">
+          <div className="mb-2 text-[10.5px]/[1] font-medium tracking-[.06em] text-ink-9">
+            BROWSER BUDGET
           </div>
-          <span className="relative block h-1 rounded-[2px] bg-edge-2">
+          <div className="flex items-baseline gap-1.5">
+            <span className="mono text-[19px]/[1] font-medium tracking-[-.02em] text-ink-2">
+              {used.toFixed(1)}
+            </span>
+            <span className="mono text-[11px]/[1] text-ink-8">/ 100 h</span>
+          </div>
+          <span className="relative mt-2.5 block h-[5px] overflow-hidden rounded-full bg-edge-2">
             <span
-              className="absolute inset-y-0 left-0 block rounded-[2px] bg-amber"
-              style={{ width: `${Math.min(100, used)}%` }}
+              className="absolute inset-y-0 left-0 block rounded-full bg-gradient-to-r from-amber to-amber-2 transition-[width] duration-700 ease-out"
+              style={{ width: `${Math.max(1.5, Math.min(100, used))}%` }}
             />
           </span>
-          <div className="text-[11.5px]/[1.5] text-ink-8">
-            this run, {duration(runCostMs)} of browser time
+          <div className="mt-2 flex items-baseline gap-1.5 text-[11.5px]/[1.4] text-ink-8">
+            <span className="mono text-ink-5">{duration(runCostMs)}</span>
+            <span>this run</span>
           </div>
         </div>
       </div>

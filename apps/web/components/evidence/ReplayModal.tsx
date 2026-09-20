@@ -30,7 +30,7 @@ export function ReplayModal({
   step?: Step;
   onClose: () => void;
 }) {
-  const { ref, ready, progress, error } = useHlsVideo(sessionId, true);
+  const { ref, painted, progress, error } = useHlsVideo(sessionId, true);
   const [pages, setPages] = useState<number | null>(null);
   // As in the feed: a clip that never arrives leaves the captured frame sharp
   // rather than blurred behind a progress bar that will never fill.
@@ -54,12 +54,6 @@ export function ReplayModal({
     };
   }, [sessionId]);
 
-  // Only start playing once it can play through, so the first frame you see
-  // is the first frame of a clip that will not stall.
-  useEffect(() => {
-    if (ready) void ref.current?.play().catch(() => undefined);
-  }, [ready, ref]);
-
   return (
     <Lightbox
       title={title}
@@ -73,7 +67,11 @@ export function ReplayModal({
     >
       {/* 16:10 to match the feed it was opened from, so the frame you clicked
           is the frame you get — just larger. */}
-      <div className="relative overflow-hidden rounded-[12px] bg-shot" style={{ aspectRatio: '16 / 10' }}>
+      {/* Fills whatever the shell gives it; the video letterboxes itself with
+          object-contain. Deriving the box from an aspect ratio instead meant
+          depending on a definite parent height, and inside a flex column that
+          resolved to zero. */}
+      <div className="group/media relative w-full flex-1 overflow-hidden rounded-[12px] bg-shot">
         {error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center">
             <div className="text-[13.5px]/[1.6] text-ink-5">{error}</div>
@@ -89,16 +87,21 @@ export function ReplayModal({
                 broken. */}
             <video
               ref={ref}
-              controls={ready}
+              controls
               muted
               playsInline
               preload="auto"
               className={clsx(
                 'absolute inset-0 size-full object-contain',
-                ready ? 'reveal' : 'opacity-0',
+                painted ? 'reveal' : 'opacity-0',
               )}
             />
-            {!ready &&
+            {painted && (
+              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/55 px-2.5 py-[5px] text-[10.5px]/[1] text-white/70 opacity-100 backdrop-blur-sm transition-opacity duration-300 group-hover/media:opacity-0">
+                hover to scrub
+              </span>
+            )}
+            {!painted &&
               (gaveUp ? (
                 <div className="absolute inset-0 overflow-hidden">
                   <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
@@ -135,7 +138,7 @@ export function ShotModal({
 }) {
   return (
     <Lightbox title={title} subtitle={subtitle} onClose={onClose}>
-      <div className="relative overflow-hidden rounded-[12px] bg-shot" style={{ aspectRatio: '16 / 10' }}>
+      <div className="relative w-full flex-1 overflow-hidden rounded-[12px] bg-shot">
         <div className="reveal absolute inset-0 overflow-auto">
           <PageShot digest={step?.digest} screenshotUrl={step?.screenshotUrl} scale="lg" />
         </div>

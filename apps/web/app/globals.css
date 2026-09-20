@@ -9,35 +9,42 @@
    =========================================================================== */
 
 @theme {
-  /* surfaces, darkest to lightest */
-  --color-page: #0b0b0b;
-  --color-rail: #101010;
-  --color-rail-2: #111111;
-  --color-stage: #141414;
-  --color-shot: #0d0d0d;
-  --color-sunk: #171717;
-  --color-card: #181818;
-  --color-card-2: #1a1a1a;
-  --color-composer: #1c1c1c;
-  --color-bubble: #1e1e1e;
-  --color-chip: #242424;
+  /* Surfaces, darkest to lightest.
+
+     Shifted a few points cool. They were pure neutral greys, which left the
+     amber sitting in the same temperature as everything around it — the one
+     colour that means "working" had nothing to be warm *against*. A cold room
+     and a warm accent is the only colour relationship here; everything else
+     is the bots' own fills. */
+  --color-page: #0a0b0d;
+  --color-rail: #0e1013;
+  --color-rail-2: #101216;
+  --color-stage: #131519;
+  --color-shot: #0c0d10;
+  --color-sunk: #16181d;
+  --color-card: #171a1f;
+  --color-card-2: #191c22;
+  --color-composer: #1b1e25;
+  --color-bubble: #1d2027;
+  --color-chip: #232730;
 
   /* hairlines */
-  --color-edge: #1c1c1c;
-  --color-edge-2: #232323;
-  --color-edge-3: #2e2e2e;
+  --color-edge: #1b1e24;
+  --color-edge-2: #222630;
+  --color-edge-3: #2d323d;
 
-  /* type */
-  --color-ink: #f0f0f0;
-  --color-ink-1: #ededed;
-  --color-ink-2: #e4e4e4;
-  --color-ink-3: #dcdcdc;
-  --color-ink-4: #c4c4c4;
-  --color-ink-5: #b4b4b4;
-  --color-ink-6: #9e9e9e;
-  --color-ink-7: #9a9a9a;
-  --color-ink-8: #909090;
-  --color-ink-9: #8a8a8a;
+  /* type — near-neutral, warming very slightly as it brightens so text on the
+     cool ground never reads blue */
+  --color-ink: #f1f2f4;
+  --color-ink-1: #eceef1;
+  --color-ink-2: #e3e5e9;
+  --color-ink-3: #dadde2;
+  --color-ink-4: #c2c6cd;
+  --color-ink-5: #b1b6bf;
+  --color-ink-6: #9ba0aa;
+  --color-ink-7: #979ca6;
+  --color-ink-8: #8d929c;
+  --color-ink-9: #868b95;
 
   /* the two accents: amber is "working", vermilion is "look here" */
   --color-amber: #e8a33d;
@@ -55,7 +62,7 @@
   --color-minus: #c98b7a;
   --color-plus: #7fd3a3;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
 
@@ -279,7 +286,16 @@
 
 .bot-face:hover,
 .bot-face:focus-visible {
-  --face-dur: 1.1s;
+  /* Was 1.1s, which is a twitch rather than a reaction — and switching
+     animation-duration mid-cycle makes the jump visible. 3.2s still brings the
+     grin forward from the ambient 7-9s without the face appearing to flinch. */
+  --face-dur: 3.2s;
+  transform: scale(1.07);
+}
+
+.bot-face {
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 .caret {
