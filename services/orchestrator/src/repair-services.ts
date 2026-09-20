@@ -20,6 +20,7 @@ export function repairServicesFromEnv(env: NodeJS.ProcessEnv = process.env): Rep
   const command = parsePreviewCommand(env.AFTERSHOCK_PREVIEW_COMMAND);
   const exec = promisify(execFile);
   return {
+    publishRepairs: env.AFTERSHOCK_PUBLISH_REPAIRS !== "false",
     github: new GitHubClient({ token: env.GITHUB_TOKEN }),
     model: openAiModel({ ...(env.OPENAI_API_KEY ? { apiKey: env.OPENAI_API_KEY } : {}) }),
     codex: codexRunner({ ...(env.OPENAI_API_KEY ? { apiKey: env.OPENAI_API_KEY } : {}) }),

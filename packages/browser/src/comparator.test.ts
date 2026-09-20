@@ -22,6 +22,16 @@ const CLAIMS = [
 ];
 
 describe("compareSnapshots", () => {
+  it("ignores empty frame placeholders but preserves named frames and price changes", () => {
+    const deltas = compareSnapshots(0,
+      snapshot({url:"https://base.dev/cart",formattedTree:'StaticText: $84.00'}),
+      snapshot({url:"https://preview.dev/cart",formattedTree:'StaticText: $NaN\n[0-4] Iframe: empty\n[0-5] Iframe: Payment form'}));
+    const signal = deltas.filter(d=>d.classification !== "noise");
+    expect(signal.some(d=>d.preview.includes("$NaN"))).toBe(true);
+    expect(signal.some(d=>d.preview.includes("Payment form"))).toBe(true);
+    expect(signal.some(d=>d.preview === "Iframe: empty")).toBe(false);
+  });
+
   it("ignores anonymous chrome with node IDs but keeps named images", () => {
     const deltas = compareSnapshots(0,
       snapshot({ url: "https://base.dev/", formattedTree: "" }),

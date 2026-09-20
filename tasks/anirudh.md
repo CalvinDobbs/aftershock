@@ -509,3 +509,47 @@ ignored env files; teammates need their own environment configuration.
 
 Unrelated `Meridian prd.md` remains untracked and excluded. All implementation is
 on `codex/anirudh-critic-director`; never push main.
+
+## Local repair review — September 20
+- Branch: codex/local-repair-review. No pushes authorized until user reviews.
+- Local ignored .env now has GitHub token, verified Vercel demo-site IDs, corrected absolute preview wrapper path, repair target feat/coupon-codes.
+- AFTERSHOCK_PUBLISH_REPAIRS=false permits real issue creation, local patching, preview deployment and verification, but skips all branch/commit/PR/status publication. Default remains true for existing installations.
+- Added a repair-chain test proving verification completes with all publisher methods uncalled.
+- Orchestrator typecheck and 71 tests passed. Sandbox-only port tests needed an unrestricted rerun.
+- Live repair acceptance in progress; do not claim verified until completed. No OAuth credentials needed or copied.
+- Live acceptance: run-1789890584039-0 filed demo_site issues #19 and #20, diagnosed the cart defect, generated a real source patch, and deployed two previews. No branches, commits, PRs or commit statuses were published.
+- Verification initially rejected the correct price fix due to Stagehand's exact "Iframe: empty" placeholder. Comparator now filters only that empty marker (named frames and prices remain signals), with regression coverage.
+- Read-only live replay after the comparator fix: original preview yielded one $NaN finding; the exact recorded cart journey on https://demo-site-c0jrn8i7f-doalnikhilgmailcoms-projects.vercel.app yielded zero findings and completed. Evidence: .aftershock/local-patch-review.json; script .aftershock/verify-local-patch.ts; log /tmp/aftershock-patch-verification.log.
+- This replay validates the cart repair, not the unfixed coupon defect or the entire original run. Dashboard's original verification remains honestly failed; no historic results overwritten.
+- Generated source checkout: /var/folders/jt/xlzlwsgn6kg24zy238btynkm0000gn/T/aftershock-repair-BgdozI. Inspect lib/money.ts. Retained for local review.
+- Full pnpm check now passes: 378 tests. Fixed the temporary git-diff test commit to bypass inherited GPG signing, without changing user Git settings.
+
+## Judge-demo reset — waiting for user go-ahead
+- Verified remote demo main remains clean at 6cff32d and coupon branch remains broken at 38c987c. No code reverts required; all repair PRs were unmerged.
+- Closed old demo PR #2 and unmerged repair PRs #15/#18. Branches retained. Original PR title/body stored in ignored .aftershock/coupon-demo-pr-template.json.
+- Restarted all local services with fresh API registry, full repair publication enabled in local .env. No new run or PR started.
+- User requires explicit go-ahead before creating the replacement coupon PR. After the run, diagnose issues only; do not implement further fixes.
+- Token has push access but /hooks returns 404 and admin=false. Trigger choice pending: local PR poller versus owner-configured webhook. Do not claim webhook integration is ready.
+- All Aftershock changes remain local and unpushed.
+
+## Successful judge rehearsal — September 20
+- User authorized direct manual trigger (no webhook/poller) and automatic repair publication in demo_site. All Aftershock code remains local.
+- Recreated original coupon PR #21: https://github.com/Nikhil-Doal/demo_site/pull/21 (original head 38c987c).
+- Triggered POST localhost:3002/runs, which forwards to the Director and registers the run for the dashboard; no webhook detection claimed.
+- UI run run_89d3b44d; Director run run-1789892431950-0. Completed in 180.085 seconds, all stages complete.
+- Confirmed cart NaN and coupon-total failures, filed issues #22/#23. Repaired the highest-ranked cart finding on attempt 1.
+- Real patch deployment: https://demo-site-lck3f747j-doalnikhilgmailcoms-projects.vercel.app/
+- Original failing D1 journey now passes, all three checklist entries pass, differential regression suite passes.
+- Automatically published verified, non-draft repair PR #24 against feat/coupon-codes; SHA 31785b81334279fde198f3b19d83bf2f30b94bc2. PR is open, not merged. Main and original coupon branch remain untouched.
+- Evidence snapshot: .aftershock/judging-complete.json. Dashboard: http://localhost:3000/runs/run_89d3b44d
+- Diagnose-only observations; NO follow-up code fixes made:
+  1. One repair per run: coupon failure remains open in #23. Verification scope is the cart journey, not all application behavior.
+  2. Clueso inaccurately says division by discountPct/zero; actual bug is undefined / 100. Correct file identified and correct patch produced.
+  3. Generated commit/PR prose says browser replay unavailable (coding-agent stage), while later pipeline verification passed. Context is confusing.
+  4. Dashboard says unknown author and sidebar stays at Diffany reading the diff despite completed run.
+  5. Clueso panel calls screenshot/tree evidence a network log and highlights QAizen coupon evidence for the cart diagnosis; evidence attribution presentation is misleading.
+  6. Run took approximately the entire three-minute presentation allocation; allow setup time or show an explicitly labeled previous completed run while live work proceeds.
+
+## Publication handoff
+- User explicitly authorized pushing the reviewed fixes and documentation directly to Aftershock main. Running services and saved demo evidence must remain untouched.
+- README now documents required repair configuration, optional publication gating, dashboard-compatible manual triggers, verified rehearsal, and one-repair-per-run scope.

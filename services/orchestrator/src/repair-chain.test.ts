@@ -22,3 +22,14 @@ it("runs real diagnosis, patch, verify and publish exports in order",async()=>{c
 it("retries once and publishes an explicitly unverified draft",async()=>{const {input,events}=setup(false);const result=await runRepairChain(input);expect(result.patch?.attempt).toBe(2);expect(result.verification?.passed).toBe(false);expect(result.pullRequest?.draft).toBe(true);expect(events.filter(e=>e.type==="curtaincall.complete")).toHaveLength(2);});
 it("cannot claim verified without the baseline",async()=>{const {input}=setup();const result=await runRepairChain({...input,baseUrl:null});expect(result.verification?.passed).toBe(false);expect(result.pullRequest?.draft).toBe(true);});
 it("does not file or patch without configured services",async()=>{const {input,services,events}=setup();const {services:_,...unconfigured}=input;const result=await runRepairChain(unconfigured);expect(result.issues).toEqual([]);expect(services.github.createIssue).not.toHaveBeenCalled();expect(events.every(e=>e.type==="stage.skip")).toBe(true);});
+
+it("verifies a local repair without publishing when review is required",async()=>{
+ const {input,services,events}=setup();
+ services.publishRepairs=false;
+ const result=await runRepairChain(input);
+ expect(result.patch?.diff).toContain("export const total=1");
+ expect(result.verification?.passed).toBe(true);
+ expect(result.pullRequest).toBeNull();
+ for (const fn of [services.github.createBranch,services.github.commitFiles,services.github.openPullRequest,services.github.setCommitStatus]) expect(fn).not.toHaveBeenCalled();
+ expect(events.some(e=>e.type==="curtaincall.complete")).toBe(true);
+});

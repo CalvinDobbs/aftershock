@@ -18,7 +18,7 @@ describe("gitDiff against a real repository", () => {
   it("returns the working-tree diff of an edited tracked file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "aftershock-gitdiff-"));
     const git = (...args: string[]) =>
-      exec("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: dir });
+      exec("git", ["-c", "commit.gpgsign=false", "-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: dir });
     await git("init", "-q");
     await writeFile(join(dir, "money.ts"), "export const a = 1;\n");
     await git("add", ".");

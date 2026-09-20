@@ -211,9 +211,8 @@ on conformance alone.
 
 ### Enabling live repair
 
-Diagnosis and patch-writing always run. **Publishing** — pushing a branch,
-deploying it and opening a PR — is gated on two variables, and stays off unless
-both are present:
+The repair chain (issue filing, diagnosis, patch generation, preview deployment,
+verification, and PR publication) runs only when both variables are present:
 
 ```bash
 GITHUB_TOKEN=                 # repo scope on the target repository
@@ -224,6 +223,52 @@ The preview command runs inside an isolated checkout of the patched code and
 must print a **ready public HTTPS URL as its final stdout line** — that is the
 whole contract. [`scripts/preview-deploy.sh`](scripts/preview-deploy.sh) is a
 working Vercel implementation; anything that satisfies the contract works.
+
+For Vercel, also set `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
+`VERCEL_PROJECT_ID`. Use an absolute script path on the machine running the
+Director, since the command executes inside the temporary repair checkout:
+
+```dotenv
+AFTERSHOCK_PREVIEW_COMMAND='["bash","/absolute/path/to/aftershock/scripts/preview-deploy.sh"]'
+AFTERSHOCK_REPAIR_BASE_BRANCH=feat/coupon-codes
+AFTERSHOCK_PUBLISH_REPAIRS=true
+```
+
+Set `AFTERSHOCK_PUBLISH_REPAIRS=false` to retain generated patches and
+verification results without creating a repair branch, committing files, opening
+a PR, or posting commit status. This still files issues and deploys previews.
+The default is publication enabled when repair services are configured.
+
+The pipeline files up to three confirmed issues and repairs the highest-ranked
+one per run. A verified cart repair does not mean a separate coupon failure was
+fixed.
+
+### Verified live rehearsal
+
+A September 20 rehearsal completed the full pipeline in approximately three
+minutes: [coupon PR #21](https://github.com/Nikhil-Doal/demo_site/pull/21) produced
+two confirmed findings, and Aftershock generated a source patch, deployed it,
+replayed the failed cart journey successfully, passed its differential regression
+suite, and opened [repair PR #24](https://github.com/Nikhil-Doal/demo_site/pull/24).
+The separate coupon-total finding remained open.
+
+This rehearsal used a manual API trigger, not a GitHub webhook. To register a
+manual run in the dashboard, send it through the API service, which forwards it
+to the Director using the configured project journeys:
+
+```bash
+curl -X POST localhost:3002/runs \
+  -H 'content-type: application/json' \
+  -d '{"repo":"owner/repo","sha":"<commit-sha>","ref":"refs/heads/feature",
+       "baseRef":"main","prNumber":123,
+       "previewUrl":"https://preview.example.com",
+       "baseUrl":"https://baseline.example.com"}'
+```
+
+Open `http://localhost:3000/runs/<runId>` using the returned ID. The earlier
+direct Director endpoint also works, but bypasses the API service's in-memory
+run registry.
+
 
 > A bare `vercel deploy` does **not** satisfy it. It prints the URL to stderr
 > and leaves `}` on stdout. That cost us a full run.
@@ -252,7 +297,7 @@ own wire format. Evidence is JSONL event traces beside content-addressed
 screenshots under `.aftershock/`, so a finished run is exactly as viewable as a
 live one — and replayable at any speed.
 
-**348 tests across 10 packages.** `pnpm check` runs typecheck and the full
+**378 tests across 10 packages.** `pnpm check` runs typecheck and the full
 suite.
 
 ---

@@ -8,6 +8,8 @@ import type { IssueDraft } from "@aftershock/critic";
 
 export interface RepairServices {
   github: PatchGitHub & { createIssue(input: { repo: string; title: string; body: string; labels?: string[] }): Promise<{ number: number; html_url: string }> };
+  /** False keeps the patch and verification local; issues and previews still run. */
+  publishRepairs?: boolean;
   model: CharterModel;
   codex: RepairLoopDeps["codex"];
   readDiff?: RepairLoopDeps["readDiff"];
@@ -88,6 +90,7 @@ export async function runRepairChain(input: { runId: string; intent: CommitInten
   state.verification = outcome.verification;
   await input.emit({ type: "understudy.complete", patch: outcome.patch });
   if (!outcome.verification) await skip(["curtain_call"], outcome.patch.rejectedFor ?? "No valid patch was produced.");
+  if (services.publishRepairs === false) return state;
   const published = await publishPatch({ outcome, issue, repo: input.intent.repo, baseBranch,
     headSha: input.intent.headSha, workingDirectory, runId: input.runId }, {
     github: services.github, ...(services.readFiles ? { readFiles: services.readFiles } : {}),

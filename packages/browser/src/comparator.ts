@@ -229,6 +229,10 @@ function treeDeltas(
       // Platform chrome, and nodes with no accessible name at all — an
       // unnamed image is unreadable to a person and so cannot be a finding.
       if (
+        // Stagehand emits this placeholder when a frame has no accessible content.
+        // Compare any exposed child content independently; keep named frames.
+        ((!from || /^Iframe: empty$/i.test(readable(from))) &&
+          (!to || /^Iframe: empty$/i.test(readable(to)))) ||
         isInjectedWidget(from) ||
         isInjectedWidget(to) ||
         isAnonymous(readable(from || to))
