@@ -1,0 +1,27 @@
+{
+  "owner/repo": {
+    "baseUrl": "https://app.example.com",
+    "fallbackRoutes": ["/", "/cart", "/checkout"],
+    "routeSamples": {
+      "slug": "wool-scarf"
+    },
+    "routeSetup": {
+      "/checkout": [
+        "Go to /products/wool-scarf",
+        "Click add to cart",
+        "Go to /checkout"
+      ]
+    },
+    "criticalJourney": {
+      "description": "Add two items and read the cart subtotal, no coupon",
+      "route": "/products/wool-scarf",
+      "steps": [
+        "Click add to cart",
+        "Go to /products/ceramic-mug",
+        "Click add to cart",
+        "Go to /cart"
+      ]
+    },
+    "maxConcurrent": 3
+  }
+}
